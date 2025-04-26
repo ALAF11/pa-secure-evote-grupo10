@@ -1,0 +1,26 @@
+name: Test JAVA project on different OS
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  unit-tests:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest,windows-latest,macos-latest ]
+    runs-on: ${{matrix.os}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4.7.0
+        with:
+          distribution: 'oracle'
+          java-version: '23'
+      - name: Run tests with Maven on ${{matrix.os}}
+        run: mvn test
