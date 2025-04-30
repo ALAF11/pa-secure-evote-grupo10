@@ -1,5 +1,3 @@
-import org.bouncycastle.pqc.math.linearalgebra.ByteUtils;
-
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.ArrayList;
@@ -12,7 +10,7 @@ public class CBC {
         SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
         cipher.init(Cipher.ENCRYPT_MODE, keySpec);
 
-        ArrayList<byte[]> splits = ByteUtils.splitByteArray(text, 16);
+        ArrayList<byte[]> splits = ByteUtils.splitByteArray(text, 16) ;
         byte[] encryptedContent = new byte[0];
         byte[] xorOperand = iv;
 
