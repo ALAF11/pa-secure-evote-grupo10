@@ -1,7 +1,10 @@
 import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.security.*;
+import java.util.Arrays;
 
 public class Encryption {
 
@@ -28,9 +31,18 @@ public class Encryption {
         try {
             byte[] secretKeyPadded = ByteBuffer.allocate(16).put(key).array();
             SecretKeySpec keySpec = new SecretKeySpec(secretKeyPadded, "AES");
-            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, keySpec);
-            return cipher.doFinal(message);
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+
+            byte[] iv = new byte[16];
+            new SecureRandom().nextBytes(iv);
+
+            cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(iv));
+            byte[] encrypted = cipher.doFinal(message);
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            outputStream.write(iv);
+            outputStream.write(encrypted);
+            return outputStream.toByteArray();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -39,30 +51,18 @@ public class Encryption {
     public static byte[] decryptAES(byte[] message, byte[] key) {
 
         try {
+            byte[] iv = Arrays.copyOfRange(message, 0, 16);
+            byte[] encrypted = Arrays.copyOfRange(message, 16, message.length);
+
             byte[] secretKeyPadded = ByteBuffer.allocate(16).put(key).array();
             SecretKeySpec keySpec = new SecretKeySpec(secretKeyPadded, "AES");
-            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-            cipher.init(Cipher.DECRYPT_MODE, keySpec);
-            return cipher.doFinal(message);
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, keySpec, new IvParameterSpec(iv));
+
+            return cipher.doFinal(encrypted);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public static byte[] signData(byte[] data, PrivateKey privateKey)
-            throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
-        Signature signer = Signature.getInstance("SHA256withRSA");
-        signer.initSign(privateKey);
-        signer.update(data);
-        return signer.sign();
-    }
-
-    public static boolean verifySignature(byte[] data, byte[] signatureBytes, PublicKey publicKey)
-            throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
-        Signature verifier = Signature.getInstance("SHA256withRSA");
-        verifier.initVerify(publicKey);
-        verifier.update(data);
-        return verifier.verify(signatureBytes);
     }
 
 }
