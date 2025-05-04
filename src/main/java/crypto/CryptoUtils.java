@@ -5,6 +5,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.security.spec.PKCS8EncodedKeySpec;
 
 import javax.crypto.Cipher;
+import java.util.Arrays;
 import java.util.Base64;
 
 public class CryptoUtils {
@@ -20,34 +21,31 @@ public class CryptoUtils {
         return keyGen.generateKeyPair();
     }
 
-
-    public static byte[] sign(byte[] data, PrivateKey privateKey) throws Exception {
+    public static byte[] sign(byte[] message, PrivateKey privateKey) throws Exception {
         Signature signature = Signature.getInstance("SHA256withRSA");
         signature.initSign(privateKey);
-        signature.update(data);
+        signature.update(message);
         return signature.sign();
     }
 
-    public static boolean verifySignature(byte[] data, byte[] signatureBytes, PublicKey publicKey) throws Exception {
+    public static boolean verifySignature(byte[] message, byte[] signatureBytes, PublicKey publicKey) throws Exception {
         Signature signature = Signature.getInstance("SHA256withRSA");
         signature.initVerify(publicKey);
-        signature.update(data);
+        signature.update(message);
         return signature.verify(signatureBytes);
     }
 
-
-    public static byte[] encrypt(byte[] data, PublicKey key) throws Exception {
+    public static byte[] encrypt(byte[] message, PublicKey key) throws Exception {
         Cipher cipher = Cipher.getInstance(RSA);
         cipher.init(Cipher.ENCRYPT_MODE, key);
-        return cipher.doFinal(data);
+        return cipher.doFinal(message);
     }
 
-    public static byte[] decrypt(byte[] data, PrivateKey key) throws Exception {
+    public static byte[] decrypt(byte[] message, PrivateKey key) throws Exception {
         Cipher cipher = Cipher.getInstance(RSA);
         cipher.init(Cipher.DECRYPT_MODE, key);
-        return cipher.doFinal(data);
+        return cipher.doFinal(message);
     }
-
 
     public static String keyToBase64(Key key) {
         return Base64.getEncoder().encodeToString(key.getEncoded());
@@ -67,14 +65,17 @@ public class CryptoUtils {
         return kf.generatePrivate(spec);
     }
 
-
-    public static byte[] sha256Digest(byte[] data) throws NoSuchAlgorithmException {
+    public static byte[] generateDigest(byte[] message) throws NoSuchAlgorithmException {
         MessageDigest digest = MessageDigest.getInstance(SHA256);
-        return digest.digest(data);
+        return digest.digest(message);
     }
 
-    public static String sha256Hex(byte[] data) throws NoSuchAlgorithmException {
-        byte[] hash = sha256Digest(data);
+    public static boolean verifyDigest(byte[] digest, byte[] computeDigest) {
+        return Arrays.equals(digest, computeDigest);
+    }
+
+    public static String sha256Hex(byte[] message) throws NoSuchAlgorithmException {
+        byte[] hash = generateDigest(message);
         StringBuilder hex = new StringBuilder();
         for (byte b : hash) hex.append(String.format("%02x", b));
         return hex.toString();
