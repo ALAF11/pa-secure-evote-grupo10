@@ -1,7 +1,11 @@
 package model;
 
+import core.BallotBox;
 import core.RegistrationAuthority;
+import core.VotingServer;
 import crypto.CryptoUtils;
+import exception.AuthenticationException;
+import exception.VoteSubmissionException;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.slf4j.Logger;
 import util.LoggingUtil;
@@ -22,7 +26,7 @@ public class Voter {
     private final KeyPair keyPair;
     private X509Certificate certificate;
     private String pemCertificate;
-    private PublicKey PublicKey;
+    private PublicKey aaPublicKey;
     private static final int MAX_RETRIES = 3;
 
     public Voter(String id) throws NoSuchAlgorithmException {
@@ -93,6 +97,69 @@ public class Voter {
             }
         }
         finally {
+            LoggingUtil.clearTransactionContext();
+            LoggingUtil.clearUserContext();
+        }
+    }
+
+    public void vote(VotingServer votingServer, BallotBox ballotBox, String choice) throws Exception {
+        String voteId = "VOTE_" + UUID.randomUUID();
+        LoggingUtil.setTransactionContext(voteId);
+        LoggingUtil.setUserContext(id);
+
+        try {
+            if (certificate == null) {
+                throw new IllegalStateException("Voter must be registered before voting");
+            }
+
+            if (aaPublicKey == null) {
+                throw new IllegalStateException("Tallying Authority public key not set");
+            }
+
+            logger.info("Voter {} initiating voting process", id);
+
+            // Create vote hash for non-repudiation
+            byte[] voteHash = CryptoUtils.hash(choice.getBytes());
+            byte[] signature = CryptoUtils.sign(voteHash, keyPair.getPrivate());
+
+            // Implement retry logic for voting
+            int retryCount = 0;
+            boolean voted = false;
+
+            while (!voted) {
+                try {
+                    // Authenticate with voting server
+                    String token = votingServer.authenticateVoter(certificate);
+                    logger.debug("Voter {} authenticated and received token", id);
+
+                    // Encrypt vote
+                    byte[] encryptedVote = CryptoUtils.encryptVote(choice, aaPublicKey);
+                    logger.debug("Vote encrypted successfully");
+
+                    // Submit vote to ballot box
+                    ballotBox.submitVote(encryptedVote, token, signature);
+                    voted = true;
+                    logger.info("Voter {} has cast a vote successfully", id);
+
+                } catch (AuthenticationException | VoteSubmissionException e) {
+                    throw e;
+                } catch (Exception e) {
+                    retryCount++;
+                    logger.warn("Voting attempt {} failed for voter {}: {}",
+                            retryCount, id, e.getMessage());
+
+                    if (retryCount < MAX_RETRIES) {
+                        try {
+                            Thread.sleep(100 * (long) Math.pow(2, retryCount));
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                    } else {
+                        throw new VoteSubmissionException("Voting failed after multiple attempts", e);
+                    }
+                }
+            }
+        } finally {
             LoggingUtil.clearTransactionContext();
             LoggingUtil.clearUserContext();
         }
