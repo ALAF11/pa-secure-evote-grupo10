@@ -24,7 +24,6 @@ public class VotingServer {
 
     // Add these fields to track voters who have already voted
     private final Set<String> votedVoters = ConcurrentHashMap.newKeySet();
-    private final Map<String, String> tokenToVoterIdMap = new ConcurrentHashMap<>();
 
     public VotingServer(PublicKey raPublicKey, ElectionManager electionManager) {
         logger.info("Initializing Voting Server");
@@ -82,8 +81,7 @@ public class VotingServer {
             String token = UUID.randomUUID().toString();
             usedTokens.add(token);
 
-            // Associate token with voter ID
-            tokenToVoterIdMap.put(token, voterId);
+            votedVoters.add(voterId);
 
             logger.info("Voter {} authenticated successfully, token issued", voterId);
             return token;
@@ -109,13 +107,6 @@ public class VotingServer {
     }
 
     public void markTokenAsUsed(String token) {
-        // Track which voter has voted
-        String voterId = tokenToVoterIdMap.remove(token);
-        if (voterId != null) {
-            votedVoters.add(voterId);
-            logger.debug("Voter {} marked as having voted", voterId);
-        }
-
         usedTokens.remove(token);
         logger.debug("Token marked as used");
     }
