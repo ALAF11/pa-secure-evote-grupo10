@@ -1,24 +1,81 @@
 package crypto;
 
-import java.security.*;
-import java.security.spec.X509EncodedKeySpec;
-import java.security.spec.PKCS8EncodedKeySpec;
-
-import javax.crypto.Cipher;
-import java.util.Arrays;
+import java.nio.ByteBuffer;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.SecureRandom;
+import java.security.Signature;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.X509Certificate;
 import java.util.Base64;
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
 
 public class CryptoUtils {
 
-    private static final String RSA = "RSA";
-    private static final String SHA256 = "SHA-256";
-    private static final int RSA_KEY_SIZE = 2048;
+    private CryptoUtils(){
+        // Prevent instantiation
+    }
 
+    public static byte[] encryptVote(String vote, PublicKey publicKey) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
 
-    public static KeyPair generateKeyPair() throws NoSuchAlgorithmException {
-        KeyPairGenerator keyGen = KeyPairGenerator.getInstance(RSA);
-        keyGen.initialize(RSA_KEY_SIZE);
-        return keyGen.generateKeyPair();
+        KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+        keyGen.init(256, new SecureRandom());
+        SecretKey aesKey = keyGen.generateKey();
+
+        byte[] iv = new byte[12];
+        new SecureRandom().nextBytes(iv);
+
+        GCMParameterSpec gcmParametersSpec = new GCMParameterSpec(128, iv);
+
+        Cipher aesCipher = Cipher.getInstance("AES/GCM/NoPadding");
+        aesCipher.init(Cipher.ENCRYPT_MODE, aesKey, gcmParametersSpec);
+        byte[] encryptedVote = aesCipher.doFinal(vote.getBytes());
+
+        Cipher rsaCipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+        rsaCipher.init(Cipher.ENCRYPT_MODE, publicKey);
+        byte[] encryptedKey = rsaCipher.doFinal(aesKey.getEncoded());
+
+        ByteBuffer buffer = ByteBuffer.allocate(4 + encryptedKey.length + 4 + iv.length + 4 + encryptedVote.length);
+        buffer.putInt(encryptedKey.length);
+        buffer.put(encryptedKey);
+        buffer.putInt(iv.length);
+        buffer.put(iv);
+        buffer.putInt(encryptedVote.length);
+        buffer.put(encryptedVote);
+
+        return buffer.array();
+    }
+
+    public static String encodeCertificateToPEM(X509Certificate cert) throws CertificateEncodingException {
+        Base64.Encoder encoder = Base64.getEncoder();
+        String encoded = encoder.encodeToString(cert.getEncoded());
+
+        StringBuilder pem = new StringBuilder();
+        pem.append("-----BEGIN CERTIFICATE-----\n");
+
+        int lineLength = 64;
+        for( int i = 0; i < encoded.length(); i += lineLength) {
+            int endIndex = Math.min(i + lineLength, encoded.length());
+            pem.append(encoded, i, endIndex).append("\n");
+        }
+
+        pem.append("-----END CERTIFICATE-----");
+        return pem.toString();
+
+    }
+
+    public static byte[] hash(byte[] message) throws NoSuchAlgorithmException {
+        java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+        return digest.digest(message);
     }
 
     public static byte[] sign(byte[] message, PrivateKey privateKey) throws Exception {
@@ -35,50 +92,5 @@ public class CryptoUtils {
         return signature.verify(signatureBytes);
     }
 
-    public static byte[] encrypt(byte[] message, PublicKey key) throws Exception {
-        Cipher cipher = Cipher.getInstance(RSA);
-        cipher.init(Cipher.ENCRYPT_MODE, key);
-        return cipher.doFinal(message);
-    }
-
-    public static byte[] decrypt(byte[] message, PrivateKey key) throws Exception {
-        Cipher cipher = Cipher.getInstance(RSA);
-        cipher.init(Cipher.DECRYPT_MODE, key);
-        return cipher.doFinal(message);
-    }
-
-    public static String keyToBase64(Key key) {
-        return Base64.getEncoder().encodeToString(key.getEncoded());
-    }
-
-    public static PublicKey base64ToPublicKey(String base64) throws Exception {
-        byte[] bytes = Base64.getDecoder().decode(base64);
-        X509EncodedKeySpec spec = new X509EncodedKeySpec(bytes);
-        KeyFactory kf = KeyFactory.getInstance(RSA);
-        return kf.generatePublic(spec);
-    }
-
-    public static PrivateKey base64ToPrivateKey(String base64) throws Exception {
-        byte[] bytes = Base64.getDecoder().decode(base64);
-        PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(bytes);
-        KeyFactory kf = KeyFactory.getInstance(RSA);
-        return kf.generatePrivate(spec);
-    }
-
-    public static byte[] generateDigest(byte[] message) throws NoSuchAlgorithmException {
-        MessageDigest digest = MessageDigest.getInstance(SHA256);
-        return digest.digest(message);
-    }
-
-    public static boolean verifyDigest(byte[] digest, byte[] computeDigest) {
-        return Arrays.equals(digest, computeDigest);
-    }
-
-    public static String sha256Hex(byte[] message) throws NoSuchAlgorithmException {
-        byte[] hash = generateDigest(message);
-        StringBuilder hex = new StringBuilder();
-        for (byte b : hash) hex.append(String.format("%02x", b));
-        return hex.toString();
-    }
 }
 
