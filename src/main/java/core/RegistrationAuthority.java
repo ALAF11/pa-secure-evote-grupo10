@@ -47,6 +47,22 @@ public class RegistrationAuthority {
         logger.info("Registration Authority initialized successfully");
     }
 
+    public boolean registerEligibleVoter(String voterId) {
+        if (!electionManager.isInPhase(ElectionPhase.REGISTRATION)) {
+            logger.warn("Cannot register voter outside of registration phase");
+            throw new IllegalStateException("Voter registration is not currently active");
+        }
+
+        if (eligibleVoters.putIfAbsent(voterId, true) == null) {
+            logger.info("Voter {} registered as eligible", voterId);
+            return true;
+        } else {
+            logger.info("Voter {} already registered as eligible", voterId);
+            return false;
+        }
+    }
+
+
     public boolean removeEligibleVoter(String voterId) {
         if (eligibleVoters.remove(voterId) != null) {
             logger.info("Voter {} removed from eligible voters list", voterId);
@@ -114,9 +130,27 @@ public class RegistrationAuthority {
         }
     }
 
+    public void shareEligibleVotersListWithVotingServer(VotingServer votingServer) {
+        votingServer.updateEligibleVotersList(new ConcurrentHashMap<>(eligibleVoters));
+        logger.info("Eligible voters list shared with Voting Server");
+    }
 
+    public void exportEligibleVotersList(String filePath) throws IOException {
+        try (FileWriter writer = new FileWriter(filePath)) {
+            writer.write("Eligible Voters List\n");
+            writer.write("Generated: " + Instant.now() + "\n");
+            writer.write("Total Eligible Voters: " + eligibleVoters.size() + "\n\n");
 
+            for (String voterId : eligibleVoters.keySet()) {
+                writer.write(voterId + "\n");
+            }
+        }
 
+        logger.info("Eligible voters list exported to {}", filePath);
+    }
 
+    public PublicKey getPublicKey() {
+        return keyPair.getPublic();
+    }
 
 }
