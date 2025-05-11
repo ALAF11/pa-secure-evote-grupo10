@@ -1,0 +1,7 @@
+Eligible Voters List
+Generated: 2025-05-11T22:09:11.944032Z
+Total Eligible Voters: 3
+
+Bob
+Alice
+Charlie
