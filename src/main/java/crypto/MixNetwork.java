@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-public class MixNetwork {
+public record MixNetwork(PublicKey tallyingAuthorityPublicKey) {
 
     private static final Logger logger = LoggingUtil.getLogger(MixNetwork.class);
 

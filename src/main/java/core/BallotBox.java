@@ -1,5 +1,6 @@
 package core;
 
+import crypto.MixNetwork;
 import exception.AuthenticationException;
 import exception.VoteSubmissionException;
 import model.ElectionManager;
@@ -16,12 +17,14 @@ public class BallotBox {
     private final Set<String> usedTokens;
     private final VotingServer votingServer;
     private final List<byte[]> voteSignatures; // For non-repudiation
+    private final MixNetwork mixNetwork;
     private final ElectionManager electionManager;
     private static final int MAX_RETRIES = 3;
 
-    public BallotBox(VotingServer votingServer, ElectionManager electionManager) {
+    public BallotBox(VotingServer votingServer, MixNetwork mixNetwork, ElectionManager electionManager) {
         logger.info("Initializing BallotBox");
         this.votingServer = votingServer;
+        this.mixNetwork = mixNetwork;
         this.electionManager = electionManager;
         this.encryptedVotes = Collections.synchronizedList(new ArrayList<>());
         this.usedTokens = ConcurrentHashMap.newKeySet();
@@ -30,6 +33,7 @@ public class BallotBox {
 
     public BallotBox(VotingServer votingServer) {
         this(votingServer,
+                new MixNetwork(votingServer.getAaPublicKey()),
                 new ElectionManager());
     }
 
@@ -113,7 +117,8 @@ public class BallotBox {
 
         logger.info("Providing {} encrypted votes for tallying", encryptedVotes.size());
 
-        return encryptedVotes;
+        // Use mix network to anonymize votes before tallying
+        return mixNetwork.mixVotes(encryptedVotes);
     }
 
     public int getVoteCount() {
