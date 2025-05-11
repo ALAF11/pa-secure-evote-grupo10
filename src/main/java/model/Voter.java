@@ -167,6 +167,14 @@ public class Voter {
         }
     }
 
+    public String getCertificateSerialNumber() {
+        if (certificate == null) {
+            throw new IllegalStateException("Voter does not have a certificate");
+        }
+
+        return certificate.getSerialNumber().toString();
+    }
+
     public void exportCertificateToFile(String filePath) throws IOException {
         if (pemCertificate == null) {
             throw new IllegalStateException("Certificate not available in PEM format");
@@ -178,7 +186,7 @@ public class Voter {
         logger.info("Certificate exported to PEM file: {}", filePath);
     }
 
-    public void setAAPublicKey(PublicKey aaPublicKey) {
+    public void setAaPublicKey(PublicKey aaPublicKey) {
         this.aaPublicKey = aaPublicKey;
     }
 
