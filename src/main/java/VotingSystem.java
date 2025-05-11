@@ -23,7 +23,7 @@ public class VotingSystem {
             ElectionManager electionManager = new ElectionManager();
 
             RegistrationAuthority registrationAuthority = new RegistrationAuthority(electionManager);
-            VotingServer votingServer = new VotingServer(registrationAuthority.getPublicKey(), electionManager);
+            VotingServer votingServer = new VotingServer(registrationAuthority.getPublicKey(), electionManager, registrationAuthority.getCrl());
 
             // Start with setup phase
             logger.info("System is in setup phase");
