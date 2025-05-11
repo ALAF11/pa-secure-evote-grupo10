@@ -4,10 +4,7 @@ import core.TallyingAuthority;
 import core.VotingServer;
 import crypto.MixNetwork;
 import exception.AuthenticationException;
-import model.CandidateManager;
-import model.ElectionManager;
-import model.ElectionPhase;
-import model.Voter;
+import model.*;
 import org.slf4j.Logger;
 import util.LoggingUtil;
 
@@ -28,6 +25,7 @@ public class VotingSystem {
             LoggingUtil.setTransactionContext(sessionId);
             logger.info("Starting e-voting system with session ID: {}", sessionId);
 
+            // Initialize election manager
             ElectionManager electionManager = new ElectionManager();
 
             // Initialize system components
@@ -50,6 +48,10 @@ public class VotingSystem {
                 candidateManager.addCandidate("Candidate1");
                 candidateManager.addCandidate("Candidate2");
             }
+
+            // Initialize threshold cryptography (3 out of 5 shares needed)
+            logger.info("Initializing threshold cryptography for vote tallying");
+            tallyingAuthority.splitKey(5, 3);
 
             // Share AA's public key with the voting server
             votingServer.setAaPublicKey(tallyingAuthority.getPublicKey());
@@ -85,9 +87,9 @@ public class VotingSystem {
             registrationAuthority.shareEligibleVotersListWithVotingServer(votingServer);
 
             // Set AA's public key with voters for vote encryption
-            voter1.setAAPublicKey(tallyingAuthority.getPublicKey());
-            voter2.setAAPublicKey(tallyingAuthority.getPublicKey());
-            voter3.setAAPublicKey(tallyingAuthority.getPublicKey());
+            voter1.setAaPublicKey(tallyingAuthority.getPublicKey());
+            voter2.setAaPublicKey(tallyingAuthority.getPublicKey());
+            voter3.setAaPublicKey(tallyingAuthority.getPublicKey());
 
             // Transition to voting phase
             electionManager.transitionTo(ElectionPhase.VOTING);
@@ -114,6 +116,26 @@ public class VotingSystem {
             logger.info("Press Enter to close the voting phase and start tallying...");
             sc.nextLine();
 
+            // Transition to tallying phase
+            electionManager.transitionTo(ElectionPhase.TALLYING);
+            logger.info("System transitioned to tallying phase");
+
+            // Simulate gathering key shares for threshold decryption
+            logger.info("Simulating threshold cryptography key reconstruction");
+            List<KeyShare> keyShares = tallyingAuthority.getKeyShares().subList(0, 3);
+
+            // Use MixNetwork to anonymize votes before tallying
+            logger.info("Anonymizing votes through MixNetwork");
+            List<byte[]> encryptedVotes = ballotBox.getEncryptedVotes();
+
+            // Tally votes using the anonymized votes from MixNetwork
+            logger.info("Tallying results using threshold cryptography...");
+            tallyingAuthority.decryptAndTallyVotes(encryptedVotes, keyShares);
+
+            // Publish results
+            tallyingAuthority.publishResults();
+
+            logger.info("E-voting process completed successfully");
         } catch (Exception e) {
             logger.error("Error in the voting process: {}", e.getMessage());
         } finally {
@@ -147,7 +169,7 @@ public class VotingSystem {
         try {
             Voter ineligibleVoter = new Voter(VOTERS.get(3));
             ineligibleVoter.registerWithRA(ra);
-            ineligibleVoter.setAAPublicKey(aa.getPublicKey());
+            ineligibleVoter.setAaPublicKey(aa.getPublicKey());
 
             if (candidateManager.isValidCandidate("Candidate3")) {
                 ineligibleVoter.vote(sv, ue, "Candidate3");

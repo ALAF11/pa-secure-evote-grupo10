@@ -186,7 +186,7 @@ public class Voter {
         logger.info("Certificate exported to PEM file: {}", filePath);
     }
 
-    public void setAAPublicKey(PublicKey aaPublicKey) {
+    public void setAaPublicKey(PublicKey aaPublicKey) {
         this.aaPublicKey = aaPublicKey;
     }
 
