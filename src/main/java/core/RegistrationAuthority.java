@@ -1,5 +1,6 @@
 package core;
 
+import crypto.CertificateRevocationList;
 import model.ElectionManager;
 import model.ElectionPhase;
 import model.Voter;
@@ -34,7 +35,9 @@ public class RegistrationAuthority {
     private static final Logger logger = LoggingUtil.getLogger(RegistrationAuthority.class);
     private final KeyPair keyPair;
     private final Map<String, Boolean> eligibleVoters = new ConcurrentHashMap<>();
+    private final CertificateRevocationList crl = new CertificateRevocationList();
     private final ElectionManager electionManager;
+    private final Map<String, String> serialNumberToVoterId = new ConcurrentHashMap<>();
 
     public RegistrationAuthority(ElectionManager electionManager) throws NoSuchAlgorithmException {
         this.electionManager = electionManager;
@@ -122,6 +125,7 @@ public class RegistrationAuthority {
             X509Certificate certificate = new JcaX509CertificateConverter()
                     .getCertificate(certHolder);
 
+            serialNumberToVoterId.put(serialNumber.toString(), voterId);
             logger.info("Certificate issued for voter {}", voterId);
 
             return certificate;
@@ -147,6 +151,25 @@ public class RegistrationAuthority {
         }
 
         logger.info("Eligible voters list exported to {}", filePath);
+    }
+
+    public boolean revokeCertificate(String serialNumber, String reason) {
+        boolean result = crl.revokeCertificate(serialNumber, reason);
+
+        if (result && serialNumberToVoterId.containsKey(serialNumber)) {
+            String voterId = serialNumberToVoterId.get(serialNumber);
+            removeEligibleVoter(voterId);
+        }
+
+        return result;
+    }
+
+    public boolean isCertificateRevoked(String serialNumber) {
+        return crl.isRevoked(serialNumber);
+    }
+
+    public CertificateRevocationList getCrl() {
+        return crl;
     }
 
     public PublicKey getPublicKey() {

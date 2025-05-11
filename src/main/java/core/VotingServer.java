@@ -1,5 +1,6 @@
 package core;
 
+import crypto.CertificateRevocationList;
 import exception.AuthenticationException;
 import model.ElectionManager;
 import model.ElectionPhase;
@@ -18,6 +19,7 @@ public class VotingServer {
     private static final Logger logger = LoggingUtil.getLogger(VotingServer.class);
     private final Set<String> usedTokens;
     private final PublicKey raPublicKey;
+    private final CertificateRevocationList crl;
     private PublicKey aaPublicKey;
     private Map<String, Boolean> eligibleVoters = new ConcurrentHashMap<>();
     private final ElectionManager electionManager;
@@ -25,15 +27,16 @@ public class VotingServer {
     // Add these fields to track voters who have already voted
     private final Set<String> votedVoters = ConcurrentHashMap.newKeySet();
 
-    public VotingServer(PublicKey raPublicKey, ElectionManager electionManager) {
+    public VotingServer(PublicKey raPublicKey, ElectionManager electionManager, CertificateRevocationList crl) {
         logger.info("Initializing Voting Server");
         this.raPublicKey = raPublicKey;
         this.electionManager = electionManager;
+        this.crl = crl;
         this.usedTokens = ConcurrentHashMap.newKeySet();
     }
 
     public VotingServer(PublicKey rapublicKey) {
-        this(rapublicKey, new ElectionManager());
+        this(rapublicKey, new ElectionManager(), new CertificateRevocationList());
     }
 
     public void updateEligibleVotersList(Map<String, Boolean> updatedList) {
@@ -66,6 +69,11 @@ public class VotingServer {
             if (!eligibleVoters.containsKey(voterId)) {
                 logger.warn("Authentication failed: voter {} is not eligible", voterId);
                 throw new AuthenticationException("Voter is not eligible to vote");
+            }
+
+            if (crl.isRevoked(cert)) {
+                logger.warn("Authentication failed: certificate for voter {} is revoked", voterId);
+                throw new AuthenticationException("Certificate has been revoked");
             }
 
             try {
