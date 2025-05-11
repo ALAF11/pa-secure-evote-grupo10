@@ -85,9 +85,9 @@ public class VotingSystem {
             registrationAuthority.shareEligibleVotersListWithVotingServer(votingServer);
 
             // Set AA's public key with voters for vote encryption
-            voter1.setAaPublicKey(tallyingAuthority.getPublicKey());
-            voter2.setAaPublicKey(tallyingAuthority.getPublicKey());
-            voter3.setAaPublicKey(tallyingAuthority.getPublicKey());
+            voter1.setAAPublicKey(tallyingAuthority.getPublicKey());
+            voter2.setAAPublicKey(tallyingAuthority.getPublicKey());
+            voter3.setAAPublicKey(tallyingAuthority.getPublicKey());
 
             // Transition to voting phase
             electionManager.transitionTo(ElectionPhase.VOTING);
@@ -147,7 +147,7 @@ public class VotingSystem {
         try {
             Voter ineligibleVoter = new Voter(VOTERS.get(3));
             ineligibleVoter.registerWithRA(ra);
-            ineligibleVoter.setAaPublicKey(aa.getPublicKey());
+            ineligibleVoter.setAAPublicKey(aa.getPublicKey());
 
             if (candidateManager.isValidCandidate("Candidate3")) {
                 ineligibleVoter.vote(sv, ue, "Candidate3");
