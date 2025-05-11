@@ -37,6 +37,10 @@ public class KeyShare {
         return y;
     }
 
+    public boolean verify() {
+        byte[] currentHash = generateVerificationHash();
+        return MessageDigest.isEqual(verificationHash, currentHash);
+    }
 
     private byte[] generateVerificationHash() {
         try {
