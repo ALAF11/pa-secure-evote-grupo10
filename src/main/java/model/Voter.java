@@ -76,6 +76,10 @@ public class Voter {
                     logger.info("Voter {} registered successfully", id);
                 }
                 catch (SecurityException e) {
+                    // Don't retry for security exception
+                    throw e;
+                }
+                catch (Exception e) {
                     retryCount++;
                     logger.warn("Registration attempt {} failed for voter {}: {}",
                             retryCount, id, e.getMessage());
@@ -91,9 +95,7 @@ public class Voter {
                     else {
                         throw e;
                     }
-
                 }
-
             }
         }
         finally {
@@ -174,6 +176,10 @@ public class Voter {
             writer.write(pemCertificate);
         }
         logger.info("Certificate exported to PEM file: {}", filePath);
+    }
+
+    public void setAAPublicKey(PublicKey aaPublicKey) {
+        this.aaPublicKey = aaPublicKey;
     }
 
 
