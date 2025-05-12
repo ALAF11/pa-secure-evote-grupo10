@@ -15,11 +15,52 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
+/**
+ * Utility class providing cryptographic operations for the e-voting system.
+ * <p>
+ * This class is responsible for:
+ * <ul>
+ *     <li>Encrypting votes using hybrid encryption (AES + RSA)</li>
+ *     <li>Encoding and decoding X.509 certificates in PEM format</li>
+ *     <li>Creating and verifying digital signatures</li>
+ *     <li>Computing cryptographic hashes of messages</li>
+ * </ul>
+ * <p>
+ * The class uses industry-standard cryptographic algorithms and practices.
+ */
+
 public class CryptoUtils {
+
+    /**
+     * Private constructor to prevent instantiation of utility class.
+     */
 
     private CryptoUtils(){
         // Prevent instantiation
     }
+
+    /**
+     * Encrypts a vote using hybrid encryption (AES + RSA).
+     * <p>
+     * The method:
+     * <ul>
+     *     <li>Generates a random AES key</li>
+     *     <li>Encrypts the vote with AES-GCM</li>
+     *     <li>Encrypts the AES key with RSA-OAEP</li>
+     *     <li>Combines the encrypted key, IV, and encrypted vote into
+     *     a single byte array</li>
+     * </ul>
+     *
+     * @param vote The vote to encrypt (as a string)
+     * @param publicKey The public key of the tallying authority
+     * @return A byte array containing the encrypted vote
+     * @throws NoSuchAlgorithmException If crypto algorithm unavailable
+     * @throws NoSuchPaddingException If padding scheme unavailable
+     * @throws InvalidKeyException If key is invalid
+     * @throws IllegalBlockSizeException If encryption fails
+     * @throws BadPaddingException If padding fails
+     * @throws InvalidAlgorithmParameterException If IV parameters are invalid
+     */
 
     public static byte[] encryptVote(String vote, PublicKey publicKey) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
 
@@ -51,6 +92,14 @@ public class CryptoUtils {
         return buffer.array();
     }
 
+    /**
+     * Encodes an X.509 certificate to PEM format.
+     *
+     * @param cert The X.509 certificate to encode
+     * @return A string containing the certificate in PEM format
+     * @throws CertificateEncodingException If encoding fails
+     */
+
     public static String encodeCertificateToPEM(X509Certificate cert) throws CertificateEncodingException {
         Base64.Encoder encoder = Base64.getEncoder();
         String encoded = encoder.encodeToString(cert.getEncoded());
@@ -69,6 +118,14 @@ public class CryptoUtils {
 
     }
 
+    /**
+     * Decodes an X.509 certificate from PEM format.
+     *
+     * @param pemCertificate The certificate in PEM format
+     * @return An X509Certificate object
+     * @throws GeneralSecurityException If decoding fails
+     */
+
     public static X509Certificate decodeCertificateFromPEM(String pemCertificate) throws GeneralSecurityException {
         String base64Cert = pemCertificate
                 .replace("-----BEGIN CERTIFICATE-----", "")
@@ -81,10 +138,27 @@ public class CryptoUtils {
         return (X509Certificate) certFactory.generateCertificate(new ByteArrayInputStream(decoded));
     }
 
+    /**
+     * Computes a SHA-256 hash of a message.
+     *
+     * @param message The message to hash
+     * @return The hash value as a byte array
+     * @throws NoSuchAlgorithmException If SHA-256 is not available
+     */
+
     public static byte[] hash(byte[] message) throws NoSuchAlgorithmException {
         java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
         return digest.digest(message);
     }
+
+    /**
+     * Signs a message using SHA256withRSA.
+     *
+     * @param message The message to sign
+     * @param privateKey The private key to use for signing
+     * @return The signature as a byte array
+     * @throws Exception If signing fails
+     */
 
     public static byte[] sign(byte[] message, PrivateKey privateKey) throws Exception {
         Signature signature = Signature.getInstance("SHA256withRSA");
@@ -92,6 +166,16 @@ public class CryptoUtils {
         signature.update(message);
         return signature.sign();
     }
+
+    /**
+     * Verifies a SHA256withRSA signature.
+     *
+     * @param message The original message
+     * @param signatureBytes The signature to verify
+     * @param publicKey The public key for verification
+     * @return true if the signature is valid, false otherwise
+     * @throws Exception If verification fails
+     */
 
     public static boolean verifySignature(byte[] message, byte[] signatureBytes, PublicKey publicKey) throws Exception {
         Signature signature = Signature.getInstance("SHA256withRSA");
