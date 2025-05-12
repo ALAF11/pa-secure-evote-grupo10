@@ -25,6 +25,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Represents the Tallying Authority in the e-voting system.
+ * <p>
+ * This class is responsible for:
+ * <ul>
+ *     <li>Decrypting and tallying votes after the election concludes</li>
+ *     <li>Implementing key sharing for threshold cryptography</li>
+ *     <li>Publishing election results</li>
+ * </ul>
+ * <p>
+ * The Tallying Authority uses a secret sharing scheme (Shamir's Secret Sharing)
+ * to split its private key into multiple shares, requiring a threshold number
+ * of shares to reconstruct the key for vote decryption.
+ */
 
 public class TallyingAuthority {
     private static final Logger logger = LoggingUtil.getLogger(TallyingAuthority.class);
@@ -35,6 +49,11 @@ public class TallyingAuthority {
     private BigInteger privateKeyBigInt;
     private final BigInteger modulus; // Store the modulus for reconstruction
 
+    /**
+     * Constructs a new Tallying Authority with RSA key pair.
+     *
+     * @throws NoSuchAlgorithmException If the RSA algorithm is not available
+     */
 
     public TallyingAuthority() throws NoSuchAlgorithmException {
         logger.info("Initializing Tallying Authority");
@@ -55,6 +74,16 @@ public class TallyingAuthority {
         logger.info("Tallying Authority initialized successfully");
     }
 
+    /**
+     * Splits the private key into multiple shares using Shamir's Secret Sharing.
+     * <p>
+     * This implements a threshold cryptography scheme were at least 'k' out of 'n'
+     * shares are required to reconstruct the private key.
+     *
+     * @param n The total number of shares to create
+     * @param k The threshold number of shares required for reconstruction
+     * @throws IllegalArgumentException If n is less than k
+     */
 
     public void splitKey(int n, int k) {
         if (n < k) {
@@ -91,6 +120,12 @@ public class TallyingAuthority {
         logger.info("Key splitting completed successfully");
     }
 
+    /**
+     * Reconstructs the private key from provided shares.
+     *
+     * @param shares The key shares for reconstruction
+     * @return The reconstructed private exponent
+     */
 
     private BigInteger reconstructKey(List<KeyShare> shares) {
         if (shares.size() < 2) {
@@ -129,6 +164,13 @@ public class TallyingAuthority {
         return reconstructed;
     }
 
+    /**
+     * Converts a BigInteger to PrivateKey.
+     *
+     * @param privateExponent The private exponent to convert
+     * @return The PrivateKey instance
+     * @throws EVotingException If conversion fails
+     */
 
     private PrivateKey convertToPrivateKey(BigInteger privateExponent) {
         try {
@@ -140,6 +182,15 @@ public class TallyingAuthority {
         }
     }
 
+    /**
+     * Decrypts and tallies the votes using the reconstructed private key.
+     * <p>
+     * This method requires a threshold number of key shares to reconstruct
+     * the private key before decryption can occur.
+     *
+     * @param encryptedVotes The list of encrypted votes to tally
+     * @param shares The list of key shares for private key reconstruction
+     */
 
     public void decryptAndTallyVotes(List<byte[]> encryptedVotes, List<KeyShare> shares) {
         String transactionId = "TALLY_" + UUID.randomUUID();
@@ -178,6 +229,14 @@ public class TallyingAuthority {
         }
     }
 
+    /**
+     * Decrypts a single encrypted vote using the private key.
+     *
+     * @param encryptedVote The encrypted vote
+     * @param privateKey The private key for decryption
+     * @return The decrypted vote
+     * @throws EVotingException If decryption fails
+     */
 
     private String decryptVote(byte[] encryptedVote, PrivateKey privateKey) {
         try {
@@ -217,6 +276,12 @@ public class TallyingAuthority {
         }
     }
 
+    /**
+     * Publishes the election results.
+     * <p>
+     * Generates a formatted report of the election results including
+     * the number of votes for each candidate.
+     */
 
     public void publishResults() {
         logger.info("Publishing election results");
@@ -235,16 +300,31 @@ public class TallyingAuthority {
         logger.info("Results published successfully");
     }
 
+    /**
+     * Gets the public key for the Tallying Authority.
+     *
+     * @return The public key
+     */
 
     public java.security.PublicKey getPublicKey() {
         return keyPair.getPublic();
     }
 
+    /**
+     * Gets all key shares.
+     *
+     * @return List of key shares
+     */
 
     public List<KeyShare> getKeyShares() {
         return new ArrayList<>(keyShares);
     }
 
+    /**
+     * Gets the election results.
+     *
+     * @return A map containing candidates and their vote counts
+     */
 
     public Map<String, Integer> getResults() {
         return new HashMap<>(results);
