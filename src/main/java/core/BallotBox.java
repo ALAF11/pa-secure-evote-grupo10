@@ -55,17 +55,6 @@ public class BallotBox {
         this.voteSignatures = Collections.synchronizedList(new ArrayList<>());
     }
 
-    /**
-     * Constructs a new BallotBox with default mix network and election manager.
-     *
-     * @param votingServer The voting server responsible for token validation
-     */
-
-    public BallotBox(VotingServer votingServer) {
-        this(votingServer,
-                new MixNetwork(votingServer.getAaPublicKey()),
-                new ElectionManager());
-    }
 
     /**
      * Submits an encrypted vote to the ballot box.

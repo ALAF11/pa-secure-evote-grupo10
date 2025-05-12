@@ -60,15 +60,6 @@ public class VotingServer {
         this.usedTokens = ConcurrentHashMap.newKeySet();
     }
 
-    /**
-     * Constructs a new Voting Server with default dependencies.
-     *
-     * @param rapublicKey The Registration Authority's public key
-     */
-
-    public VotingServer(PublicKey rapublicKey) {
-        this(rapublicKey, new ElectionManager(), new CertificateRevocationList());
-    }
 
     /**
      * Updates the list of eligible voters from the Registration Authority.
