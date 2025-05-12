@@ -38,7 +38,7 @@ public class CandidateManager {
      * Empty lines are also ignored.
      *
      * @param configFile Path to the configuration file
-     * @return {@code true} if candidates were loaded successfully, {@code false} otherwise
+     * @return true if candidates were loaded successfully, false otherwise
      */
 
     public boolean loadCandidatesFromFile(String configFile) {
@@ -71,9 +71,9 @@ public class CandidateManager {
     }
 
     /**
-     * Returns an unmodifiable list of registered candidates.
+     * Gets an unmodifiable list of all candidates.
      *
-     * @return List of candidate names
+     * @return An unmodifiable list of candidate names
      */
 
     public List<String> getCandidates() {
@@ -84,7 +84,7 @@ public class CandidateManager {
      * Checks whether a given name corresponds to a valid candidate.
      *
      * @param candidateName The name to check
-     * @return {@code true} if the name is a valid candidate, {@code false} otherwise
+     * @return true if the name is a valid candidate, false otherwise
      */
 
     public boolean isValidCandidate(String candidateName) {

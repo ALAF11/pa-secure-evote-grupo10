@@ -145,7 +145,7 @@ public class KeyShare {
     /**
      * Generates string representation.
      *
-     * @return String representation
+     * @return string representation
      */
 
     @Override
