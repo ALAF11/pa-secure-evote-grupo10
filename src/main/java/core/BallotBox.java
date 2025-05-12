@@ -10,6 +10,22 @@ import util.LoggingUtil;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.*;
 
+/**
+ * Represents an electronic ballot box for securely storing encrypted votes.
+ * <p>
+ * This class is responsible for:
+ * <ul>
+ *     <li>Accepting and validating vote submissions</li>
+ *     <li>Preventing duplicate voting through token validation</li>
+ *     <li>Storing encrypted votes securely</li>
+ *     <li>Providing encrypted votes for tallying after the voting phase ends</li>
+ *     <li>Implementing retry logic for transient failures during vote submission</li>
+ * </ul>
+ * <p>
+ * The BallotBox works with the VotingServer to validate voter tokens and
+ * with the MixNetwork to anonymize votes before they are tallied.
+ */
+
 public class BallotBox {
 
     private static final Logger logger = LoggingUtil.getLogger(BallotBox.class);
@@ -21,6 +37,14 @@ public class BallotBox {
     private final ElectionManager electionManager;
     private static final int MAX_RETRIES = 3;
 
+    /**
+     * Constructs a new BallotBox with the specified dependencies.
+     *
+     * @param votingServer The voting server responsible for token validation
+     * @param mixNetwork The mix network for anonymizing votes
+     * @param electionManager The election manager for phase control
+     */
+
     public BallotBox(VotingServer votingServer, MixNetwork mixNetwork, ElectionManager electionManager) {
         logger.info("Initializing BallotBox");
         this.votingServer = votingServer;
@@ -31,11 +55,30 @@ public class BallotBox {
         this.voteSignatures = Collections.synchronizedList(new ArrayList<>());
     }
 
+    /**
+     * Constructs a new BallotBox with default mix network and election manager.
+     *
+     * @param votingServer The voting server responsible for token validation
+     */
+
     public BallotBox(VotingServer votingServer) {
         this(votingServer,
                 new MixNetwork(votingServer.getAaPublicKey()),
                 new ElectionManager());
     }
+
+    /**
+     * Submits an encrypted vote to the ballot box.
+     * <p>
+     * This method validates the voting token, checks for duplicate token use,
+     * and implements retry logic for handling transient errors.
+     *
+     * @param encryptedVote The encrypted vote data
+     * @param token The voting token issued by the voting server
+     * @param signature The voter's signature for non-repudiation
+     * @throws VoteSubmissionException If the vote cannot be submitted
+     * @throws AuthenticationException If the token is invalid
+     */
 
     public synchronized void submitVote(byte[] encryptedVote, String token, byte[] signature) {
         String transactionId = "SUBMIT_" + UUID.randomUUID();
@@ -101,6 +144,14 @@ public class BallotBox {
         LoggingUtil.clearTransactionContext();
     }
 
+    /**
+     * Retrieves the signature for a specific vote.
+     *
+     * @param index The index of the vote
+     * @return The signature for the specified vote
+     * @throws IndexOutOfBoundsException If the index is out of range
+     */
+
     public byte[] getVoteSignature(int index) {
         if (index < 0 || index >= voteSignatures.size()) {
             throw new IndexOutOfBoundsException("Invalid vote index");
@@ -108,6 +159,16 @@ public class BallotBox {
 
         return voteSignatures.get(index);
     }
+
+    /**
+     * Retrieves all encrypted votes for tallying.
+     * <p>
+     * This method uses the mix network to anonymize votes before returning them.
+     * Can only be called after the voting phase has ended.
+     *
+     * @return A list of anonymized encrypted votes
+     * @throws SecurityException If called during the voting phase
+     */
 
     public List<byte[]> getEncryptedVotes() {
         if (electionManager.isInPhase(ElectionPhase.VOTING)) {
@@ -120,6 +181,12 @@ public class BallotBox {
         // Use mix network to anonymize votes before tallying
         return mixNetwork.mixVotes(encryptedVotes);
     }
+
+    /**
+     * Returns the total number of votes collected
+     *
+     * @return The number of votes
+     */
 
     public int getVoteCount() {
         return encryptedVotes.size();
