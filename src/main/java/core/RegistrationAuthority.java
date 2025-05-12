@@ -29,6 +29,19 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Represents the Registration Authority in the e-voting system.
+ * <p>
+ * <ul>
+ *     <li>Maintaining the list of eligible voters</li>
+ *     <li>Issuing X.509 certificates to authenticated voters</li>
+ *     <li>Sharing eligible voter information with the Voting Server</li>
+ *     <li>Managing certificate revocation through a Certificate Revocation List (CRL)</li>
+ * </ul>
+ * <p>
+ * The Registration Authority operates primarily during the registration phase of an election,
+ * as managed by the ElectionManager.
+ */
 
 public class RegistrationAuthority {
 
@@ -38,6 +51,13 @@ public class RegistrationAuthority {
     private final CertificateRevocationList crl = new CertificateRevocationList();
     private final ElectionManager electionManager;
     private final Map<String, String> serialNumberToVoterId = new ConcurrentHashMap<>();
+
+    /**
+     * Constructs a new Registration Authority with the specified election manager.
+     *
+     * @param electionManager The election manager for phase control
+     * @throws NoSuchAlgorithmException If the RSA algorithm is not available
+     */
 
     public RegistrationAuthority(ElectionManager electionManager) throws NoSuchAlgorithmException {
         this.electionManager = electionManager;
@@ -49,6 +69,16 @@ public class RegistrationAuthority {
 
         logger.info("Registration Authority initialized successfully");
     }
+
+    /**
+     * Registers a voter as eligible to participate in the election.
+     * <p>
+     * This method can only be called during the registration phase.
+     *
+     * @param voterId The unique identifier of the voter
+     * @return true if the voter was successfully registered, false if already registered
+     * @throws IllegalStateException If not in the registration phase
+     */
 
     public boolean registerEligibleVoter(String voterId) {
         if (!electionManager.isInPhase(ElectionPhase.REGISTRATION)) {
@@ -65,6 +95,12 @@ public class RegistrationAuthority {
         }
     }
 
+    /**
+     * Removes a voter from the list of eligible voters.
+     *
+     * @param voterId The unique identifier of the voter
+     * @return true if the voter was removed, false if not found
+     */
 
     public boolean removeEligibleVoter(String voterId) {
         if (eligibleVoters.remove(voterId) != null) {
@@ -75,6 +111,19 @@ public class RegistrationAuthority {
             return false;
         }
     }
+
+    /**
+     * Issues an X.509 certificate to an eligible voter.
+     * <p>
+     * This method can only be called during the registration phase.
+     *
+     * @param voter The voter object containing identification and public key
+     * @return A signed X.509 certificate
+     * @throws OperatorCreationException If there's an error creating the certificate
+     * @throws CertificateException If there's an error with the certificate
+     * @throws IllegalStateException If not in the registration phase
+     * @throws SecurityException If the voter is not eligible
+     */
 
     public X509Certificate issueCertificate(Voter voter) throws OperatorCreationException, CertificateException {
         String transactionId = "CERT_" + UUID.randomUUID();
@@ -134,10 +183,23 @@ public class RegistrationAuthority {
         }
     }
 
+    /**
+     * Shares the list of eligible voters with the voting server.
+     *
+     * @param votingServer The voting server to update
+     */
+
     public void shareEligibleVotersListWithVotingServer(VotingServer votingServer) {
         votingServer.updateEligibleVotersList(new ConcurrentHashMap<>(eligibleVoters));
         logger.info("Eligible voters list shared with Voting Server");
     }
+
+    /**
+     * Exports the list of eligible voters to a file.
+     *
+     * @param filePath The path to save the file
+     * @throws IOException If there's an error writing to the file
+     */
 
     public void exportEligibleVotersList(String filePath) throws IOException {
         try (FileWriter writer = new FileWriter(filePath)) {
@@ -152,6 +214,14 @@ public class RegistrationAuthority {
 
         logger.info("Eligible voters list exported to {}", filePath);
     }
+
+    /**
+     * Revokes a certificate by adding it to the Certificate Revocation List.
+     *
+     * @param serialNumber The serial number of the certificate to revoke
+     * @param reason The reason for revocation
+     * @return true if the certificate was revoked, false otherwise
+     */
 
     public boolean revokeCertificate(String serialNumber, String reason) {
         boolean result = crl.revokeCertificate(serialNumber, reason);
@@ -168,9 +238,21 @@ public class RegistrationAuthority {
         return crl.isRevoked(serialNumber);
     }
 
+    /**
+     * Gets the Certificate Revocation List.
+     *
+     * @return The CRL instance
+     */
+
     public CertificateRevocationList getCrl() {
         return crl;
     }
+
+    /**
+     * Gets the public key of the Registration Authority.
+     *
+     * @return The public key
+     */
 
     public PublicKey getPublicKey() {
         return keyPair.getPublic();
