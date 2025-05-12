@@ -123,7 +123,7 @@ public class VoterTest {
         certificateField.setAccessible(true);
         certificateField.set(voter, mockCertificate);
 
-        voter.setAAPublicKey(mockAAPublicKey);
+        voter.setAaPublicKey(mockAAPublicKey);
 
         // Mock dependencies
         when(mockVotingServer.authenticateVoter(any())).thenReturn("TEST_TOKEN");
@@ -152,7 +152,7 @@ public class VoterTest {
         certificateField.setAccessible(true);
         certificateField.set(voter, mockCertificate);
 
-        voter.setAAPublicKey(mockAAPublicKey);
+        voter.setAaPublicKey(mockAAPublicKey);
 
         // Mock authentication failure
         when(mockVotingServer.authenticateVoter(any())).thenThrow(new AuthenticationException("Authentication failed"));
