@@ -15,9 +15,50 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.UUID;
 
+/**
+ * Main class that orchestrates the entire e-voting system workflow.
+ * <p>
+ * This class is responsible for:
+ * <ul>
+ *     <li>Initializing all system components</li>
+ *     <li>Managing the election lifecycle through its different phases</li>
+ *     <li>Coordinating the registration, voting, and tallying processes</li>
+ *     <li>Handling error conditions and providing logging</li>
+ *     <li>Demonstrating the security features of the system</li>
+ * </ul>
+ * <p>
+ * VotingSystem serves as the entry point for the pa-secure-evote application and
+ * demonstrates a complete election workflow from setup to results publication.
+ */
+
 public class VotingSystem {
+    /**
+     * Logger for the VotingSystem class, obtained from LoggingUtil.
+     */
     private static final Logger logger = LoggingUtil.getLogger(VotingSystem.class);
+    /**
+     * List of voter IDs used for testing the e-voting system.
+     */
     private static final List<String> VOTERS = List.of("Alice", "Bob", "Charlie", "Eve");
+
+    /**
+     * Main method that runs the complete e-voting process demonstration.
+     * <p>
+     * The method:
+     * <ol>
+     *     <li>Initializes the election manager and system components</li>
+     *     <li>Sets up candidates for the election</li>
+     *     <li>Implements threshold cryptography for secure vote tallying</li>
+     *     <li>Manages the election through its phases (setup, registration, voting, tallying)</li>
+     *     <li>Demonstrates voter registration and certificate issuance</li>
+     *     <li>Demonstrates vote casting and error handling</li>
+     *     <li>Demonstrates certificate revocation</li>
+     *     <li>Coordinates vote anonymization through the mix network</li>
+     *     <li>Demonstrates threshold decryption and results publication</li>
+     * </ol>
+     *
+     * @param args Command-line arguments
+     */
 
     public static void main(String[] args) {
         try (Scanner sc = new Scanner(System.in)) {
@@ -144,6 +185,24 @@ public class VotingSystem {
         }
     }
 
+    /**
+     * Attempts to cast a vote with comprehensive error handling.
+     * <p>
+     * This method:
+     * <ol>
+     *     <li>Validates that the candidate exists</li>
+     *     <li>Attempts to cast a vote for the specified candidate</li>
+     *     <li>Handles authentication failures (including duplicate voting attempts)</li>
+     *     <li>Handles other unexpected exceptions during the voting process</li>
+     * </ol>
+     *
+     * @param voter The voter attempting to cast a vote
+     * @param votingServer The voting server for authentication
+     * @param ballotBox The ballot box for vote submission
+     * @param candidateManager The candidate manager for candidate validation
+     * @param candidateName The name of the candidate the voter is voting for
+     */
+
     private static void castVoteWithErrorHandling(Voter voter, VotingServer votingServer,
                                                   BallotBox ballotBox, CandidateManager candidateManager,
                                                   String candidateName) {
@@ -164,6 +223,22 @@ public class VotingSystem {
         }
     }
 
+    /**
+     * Tests the system's security by attempting to cast a vote with an ineligible voter.
+     * <p>
+     * This method demonstrates how the system handles unauthorized voting attempts,
+     * which is an important security feature of the e-voting system.
+     * <p>
+     * Sets a special "SecurityAudit" user context for logging these
+     * security events.
+     *
+     * @param ra The registration authority
+     * @param sv The voting server
+     * @param ue The ballot box
+     * @param aa The tallying authority
+     * @param candidateManager The candidate manager
+     */
+
     private static void testIneligibleVoter(RegistrationAuthority ra, VotingServer sv, BallotBox ue,
                                             TallyingAuthority aa, CandidateManager candidateManager) {
         LoggingUtil.setUserContext("SecurityAudit");
@@ -183,6 +258,16 @@ public class VotingSystem {
             LoggingUtil.clearUserContext();
         }
     }
+
+    /**
+     * Creates a sample candidates configuration file if it doesn't
+     * already exist.
+     * <p>
+     * The file contains a list of candidates, one per line, with comments
+     * preceded by '#' characters.
+     *
+     * @param filename The name of the candidates file to create
+     */
 
     private static void createSampleCandidatesFile(String filename) {
         File file = new File(filename);
