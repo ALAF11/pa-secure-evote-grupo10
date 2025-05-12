@@ -93,20 +93,6 @@ public class CertificateRevocationList {
         return revokedCertificates.get(serialNumber);
     }
 
-    /**
-     * Gets all certificates that have been revoked since a specified time.
-     *
-     * @param since The instant after which to check for revocations
-     * @return A set of serial numbers for certificates revoked after the
-     * specified time
-     */
-
-    public Set<String> getRevokedCertificatesSince(Instant since) {
-        return revokedCertificates.entrySet().stream()
-                .filter(entry -> entry.getValue().getTimestamp().isAfter(since))
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toSet());
-    }
 
     /**
      * Gets all revoked certificates and their revocation information.
