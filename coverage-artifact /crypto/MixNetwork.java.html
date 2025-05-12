@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MixNetwork.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pa-secure-evote</a> &gt; <a href="index.source.html" class="el_package">crypto</a> &gt; <span class="el_source">MixNetwork.java</span></div><h1>MixNetwork.java</h1><pre class="source lang-java linenums">package crypto;
+
+import org.slf4j.Logger;
+import util.LoggingUtil;
+
+import java.security.PublicKey;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * Represents a mix network for anonymizing encrypted votes in the e-voting system.
+ * &lt;p&gt;
+ * This class is responsible for:
+ * &lt;ul&gt;
+ *     &lt;li&gt;Taking a collection of encrypted votes&lt;/li&gt;
+ *     &lt;li&gt;Shuffling them using a secure random algorithm (Fisher-Yates)&lt;/li&gt;
+ *     &lt;li&gt;Returning the shuffled votes with no way to trace the original order&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * The mix network ensures voter anonymity by breaking the link between the order
+ * in which votes were cast and the order in which they are tallied.
+ * &lt;p&gt;
+ * Implemented as a Java record for immutability.
+ * @param tallyingAuthorityPublicKey The public key of the Tallying Authority
+ */
+
+<span class="fc" id="L29">public record MixNetwork(PublicKey tallyingAuthorityPublicKey) {</span>
+
+<span class="fc" id="L31">    private static final Logger logger = LoggingUtil.getLogger(MixNetwork.class);</span>
+
+    /**
+     * Mixes (shuffles) a list of encrypted votes to ensure anonymity.
+     * &lt;p&gt;
+     * The method uses the Fisher-Yates algorithm with a cryptographically secure
+     * random number generator to shuffle the votes.
+     *
+     * @param encryptedVotes The list of encrypted votes to mix
+     * @return A new list containing the same votes in a randomly shuffled order
+     */
+
+    public List&lt;byte[]&gt; mixVotes(List&lt;byte[]&gt; encryptedVotes) {
+<span class="fc" id="L44">        String mixId = &quot;MIX_&quot; + UUID.randomUUID().toString();</span>
+<span class="fc" id="L45">        LoggingUtil.setTransactionContext(mixId);</span>
+
+        try {
+<span class="fc" id="L48">            logger.info(&quot;Mixing {} votes&quot;, encryptedVotes.size());</span>
+
+            // Create a copy of the encrypted votes
+<span class="fc" id="L51">            List&lt;byte[]&gt; mixedVotes = new ArrayList&lt;&gt;(encryptedVotes);</span>
+
+            // Shuffle the votes using Fisher-Yates algorithm
+<span class="fc" id="L54">            SecureRandom random = new SecureRandom();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            for (int i = mixedVotes.size() - 1; i &gt; 0; i--) {</span>
+<span class="fc" id="L56">                int j = random.nextInt(i + 1);</span>
+
+                // Swap votes
+<span class="fc" id="L59">                byte[] temp = mixedVotes.get(j);</span>
+<span class="fc" id="L60">                mixedVotes.set(j, mixedVotes.get(i));</span>
+<span class="fc" id="L61">                mixedVotes.set(i, temp);</span>
+            }
+
+<span class="fc" id="L64">            logger.info(&quot;Vote mixing completed successfully&quot;);</span>
+<span class="fc" id="L65">            return mixedVotes;</span>
+        } finally {
+<span class="fc" id="L67">            LoggingUtil.clearTransactionContext();</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

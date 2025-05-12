@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EVotingException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pa-secure-evote</a> &gt; <a href="index.source.html" class="el_package">exception</a> &gt; <span class="el_source">EVotingException.java</span></div><h1>EVotingException.java</h1><pre class="source lang-java linenums">package exception;
+
+/**
+ * Base exception class for all exceptions in the e-voting system.
+ * &lt;p&gt;
+ * This class serves as the parent for all custom exceptions in the pa-secure-evote
+ * system. It extends RuntimeException to allow for unchecked exceptions throughout
+ * the application, reducing the need for explicit exception handling in every method.
+ * &lt;p&gt;
+ * Leveraging a custom exception hierarchy allows the system to provide more specific
+ * error information and to implement targeted exception handling across different components.
+ */
+
+public class EVotingException extends RuntimeException {
+
+    /**
+     * Constructs a new e-voting exception with the specified detail message.
+     *
+     * @param message The detail message (which is saved for later retrieval by the getMessage() method)
+     */
+
+    public EVotingException(String message) {
+<span class="fc" id="L23">        super(message);</span>
+<span class="fc" id="L24">    }</span>
+
+    /**
+     * Constructs a new e-voting exception with the specified detail message and cause.
+     *
+     * @param message The detail message (which is saved for later retrieval by the getMessage() method)
+     * @param cause The cause (which is saved for later retrieval by the getCause() method)
+     */
+
+    public EVotingException(String message, Throwable cause) {
+<span class="fc" id="L34">        super(message, cause);</span>
+<span class="fc" id="L35">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

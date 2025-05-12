@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CryptoUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pa-secure-evote</a> &gt; <a href="index.source.html" class="el_package">crypto</a> &gt; <span class="el_source">CryptoUtils.java</span></div><h1>CryptoUtils.java</h1><pre class="source lang-java linenums">package crypto;
+
+import java.io.ByteArrayInputStream;
+import java.nio.ByteBuffer;
+import java.security.*;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.util.Base64;
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+
+/**
+ * Utility class providing cryptographic operations for the e-voting system.
+ * &lt;p&gt;
+ * This class is responsible for:
+ * &lt;ul&gt;
+ *     &lt;li&gt;Encrypting votes using hybrid encryption (AES + RSA)&lt;/li&gt;
+ *     &lt;li&gt;Encoding and decoding X.509 certificates in PEM format&lt;/li&gt;
+ *     &lt;li&gt;Creating and verifying digital signatures&lt;/li&gt;
+ *     &lt;li&gt;Computing cryptographic hashes of messages&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * The class uses industry-standard cryptographic algorithms and practices.
+ */
+
+public class CryptoUtils {
+
+    /**
+     * Private constructor to prevent instantiation of utility class.
+     */
+
+    private CryptoUtils(){
+        // Prevent instantiation
+    }
+
+    /**
+     * Encrypts a vote using hybrid encryption (AES + RSA).
+     * &lt;p&gt;
+     * The method:
+     * &lt;ul&gt;
+     *     &lt;li&gt;Generates a random AES key&lt;/li&gt;
+     *     &lt;li&gt;Encrypts the vote with AES-GCM&lt;/li&gt;
+     *     &lt;li&gt;Encrypts the AES key with RSA-OAEP&lt;/li&gt;
+     *     &lt;li&gt;Combines the encrypted key, IV, and encrypted vote into
+     *     a single byte array&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param vote The vote to encrypt (as a string)
+     * @param publicKey The public key of the tallying authority
+     * @return A byte array containing the encrypted vote
+     * @throws NoSuchAlgorithmException If crypto algorithm unavailable
+     * @throws NoSuchPaddingException If padding scheme unavailable
+     * @throws InvalidKeyException If key is invalid
+     * @throws IllegalBlockSizeException If encryption fails
+     * @throws BadPaddingException If padding fails
+     * @throws InvalidAlgorithmParameterException If IV parameters are invalid
+     */
+
+    public static byte[] encryptVote(String vote, PublicKey publicKey) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
+
+<span class="fc" id="L67">        KeyGenerator keyGen = KeyGenerator.getInstance(&quot;AES&quot;);</span>
+<span class="fc" id="L68">        keyGen.init(256, new SecureRandom());</span>
+<span class="fc" id="L69">        SecretKey aesKey = keyGen.generateKey();</span>
+
+<span class="fc" id="L71">        byte[] iv = new byte[12];</span>
+<span class="fc" id="L72">        new SecureRandom().nextBytes(iv);</span>
+
+<span class="fc" id="L74">        GCMParameterSpec gcmParametersSpec = new GCMParameterSpec(128, iv);</span>
+
+<span class="fc" id="L76">        Cipher aesCipher = Cipher.getInstance(&quot;AES/GCM/NoPadding&quot;);</span>
+<span class="fc" id="L77">        aesCipher.init(Cipher.ENCRYPT_MODE, aesKey, gcmParametersSpec);</span>
+<span class="fc" id="L78">        byte[] encryptedVote = aesCipher.doFinal(vote.getBytes());</span>
+
+<span class="fc" id="L80">        Cipher rsaCipher = Cipher.getInstance(&quot;RSA/ECB/OAEPWithSHA-256AndMGF1Padding&quot;);</span>
+<span class="fc" id="L81">        rsaCipher.init(Cipher.ENCRYPT_MODE, publicKey);</span>
+<span class="fc" id="L82">        byte[] encryptedKey = rsaCipher.doFinal(aesKey.getEncoded());</span>
+
+<span class="fc" id="L84">        ByteBuffer buffer = ByteBuffer.allocate(4 + encryptedKey.length + 4 + iv.length + 4 + encryptedVote.length);</span>
+<span class="fc" id="L85">        buffer.putInt(encryptedKey.length);</span>
+<span class="fc" id="L86">        buffer.put(encryptedKey);</span>
+<span class="fc" id="L87">        buffer.putInt(iv.length);</span>
+<span class="fc" id="L88">        buffer.put(iv);</span>
+<span class="fc" id="L89">        buffer.putInt(encryptedVote.length);</span>
+<span class="fc" id="L90">        buffer.put(encryptedVote);</span>
+
+<span class="fc" id="L92">        return buffer.array();</span>
+    }
+
+    /**
+     * Encodes an X.509 certificate to PEM format.
+     *
+     * @param cert The X.509 certificate to encode
+     * @return A string containing the certificate in PEM format
+     * @throws CertificateEncodingException If encoding fails
+     */
+
+    public static String encodeCertificateToPEM(X509Certificate cert) throws CertificateEncodingException {
+<span class="fc" id="L104">        Base64.Encoder encoder = Base64.getEncoder();</span>
+<span class="fc" id="L105">        String encoded = encoder.encodeToString(cert.getEncoded());</span>
+
+<span class="fc" id="L107">        StringBuilder pem = new StringBuilder();</span>
+<span class="fc" id="L108">        pem.append(&quot;-----BEGIN CERTIFICATE-----\n&quot;);</span>
+
+<span class="fc" id="L110">        int lineLength = 64;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for( int i = 0; i &lt; encoded.length(); i += lineLength) {</span>
+<span class="fc" id="L112">            int endIndex = Math.min(i + lineLength, encoded.length());</span>
+<span class="fc" id="L113">            pem.append(encoded, i, endIndex).append(&quot;\n&quot;);</span>
+        }
+
+<span class="fc" id="L116">        pem.append(&quot;-----END CERTIFICATE-----&quot;);</span>
+<span class="fc" id="L117">        return pem.toString();</span>
+
+    }
+
+    /**
+     * Decodes an X.509 certificate from PEM format.
+     *
+     * @param pemCertificate The certificate in PEM format
+     * @return An X509Certificate object
+     * @throws GeneralSecurityException If decoding fails
+     */
+
+    public static X509Certificate decodeCertificateFromPEM(String pemCertificate) throws GeneralSecurityException {
+<span class="fc" id="L130">        String base64Cert = pemCertificate</span>
+<span class="fc" id="L131">                .replace(&quot;-----BEGIN CERTIFICATE-----&quot;, &quot;&quot;)</span>
+<span class="fc" id="L132">                .replace(&quot;-----END CERTIFICATE-----&quot;, &quot;&quot;)</span>
+<span class="fc" id="L133">                .replaceAll(&quot;\\s&quot;, &quot;&quot;);</span>
+
+<span class="fc" id="L135">        byte[] decoded = Base64.getDecoder().decode(base64Cert);</span>
+
+<span class="fc" id="L137">        CertificateFactory certFactory = CertificateFactory.getInstance(&quot;X.509&quot;);</span>
+<span class="fc" id="L138">        return (X509Certificate) certFactory.generateCertificate(new ByteArrayInputStream(decoded));</span>
+    }
+
+    /**
+     * Computes a SHA-256 hash of a message.
+     *
+     * @param message The message to hash
+     * @return The hash value as a byte array
+     * @throws NoSuchAlgorithmException If SHA-256 is not available
+     */
+
+    public static byte[] hash(byte[] message) throws NoSuchAlgorithmException {
+<span class="fc" id="L150">        java.security.MessageDigest digest = java.security.MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L151">        return digest.digest(message);</span>
+    }
+
+    /**
+     * Signs a message using SHA256withRSA.
+     *
+     * @param message The message to sign
+     * @param privateKey The private key to use for signing
+     * @return The signature as a byte array
+     * @throws Exception If signing fails
+     */
+
+    public static byte[] sign(byte[] message, PrivateKey privateKey) throws Exception {
+<span class="fc" id="L164">        Signature signature = Signature.getInstance(&quot;SHA256withRSA&quot;);</span>
+<span class="fc" id="L165">        signature.initSign(privateKey);</span>
+<span class="fc" id="L166">        signature.update(message);</span>
+<span class="fc" id="L167">        return signature.sign();</span>
+    }
+
+    /**
+     * Verifies a SHA256withRSA signature.
+     *
+     * @param message The original message
+     * @param signatureBytes The signature to verify
+     * @param publicKey The public key for verification
+     * @return true if the signature is valid, false otherwise
+     * @throws Exception If verification fails
+     */
+
+    public static boolean verifySignature(byte[] message, byte[] signatureBytes, PublicKey publicKey) throws Exception {
+<span class="fc" id="L181">        Signature signature = Signature.getInstance(&quot;SHA256withRSA&quot;);</span>
+<span class="fc" id="L182">        signature.initVerify(publicKey);</span>
+<span class="fc" id="L183">        signature.update(message);</span>
+<span class="fc" id="L184">        return signature.verify(signatureBytes);</span>
+    }
+
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

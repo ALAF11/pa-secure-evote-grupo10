@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VotingSystem.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pa-secure-evote</a> &gt; <a href="index.source.html" class="el_package">default</a> &gt; <span class="el_source">VotingSystem.java</span></div><h1>VotingSystem.java</h1><pre class="source lang-java linenums">import core.BallotBox;
+import core.RegistrationAuthority;
+import core.TallyingAuthority;
+import core.VotingServer;
+import crypto.MixNetwork;
+import exception.AuthenticationException;
+import model.*;
+import org.slf4j.Logger;
+import util.LoggingUtil;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.List;
+import java.util.Scanner;
+import java.util.UUID;
+
+/**
+ * Main class that orchestrates the entire e-voting system workflow.
+ * &lt;p&gt;
+ * This class is responsible for:
+ * &lt;ul&gt;
+ *     &lt;li&gt;Initializing all system components&lt;/li&gt;
+ *     &lt;li&gt;Managing the election lifecycle through its different phases&lt;/li&gt;
+ *     &lt;li&gt;Coordinating the registration, voting, and tallying processes&lt;/li&gt;
+ *     &lt;li&gt;Handling error conditions and providing logging&lt;/li&gt;
+ *     &lt;li&gt;Demonstrating the security features of the system&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * VotingSystem serves as the entry point for the pa-secure-evote application and
+ * demonstrates a complete election workflow from setup to results publication.
+ */
+
+<span class="nc" id="L34">public class VotingSystem {</span>
+    /**
+     * Logger for the VotingSystem class, obtained from LoggingUtil.
+     */
+<span class="nc" id="L38">    private static final Logger logger = LoggingUtil.getLogger(VotingSystem.class);</span>
+    /**
+     * List of voter IDs used for testing the e-voting system.
+     */
+<span class="nc" id="L42">    private static final List&lt;String&gt; VOTERS = List.of(&quot;Alice&quot;, &quot;Bob&quot;, &quot;Charlie&quot;, &quot;Eve&quot;);</span>
+
+    /**
+     * Main method that runs the complete e-voting process demonstration.
+     * &lt;p&gt;
+     * The method:
+     * &lt;ol&gt;
+     *     &lt;li&gt;Initializes the election manager and system components&lt;/li&gt;
+     *     &lt;li&gt;Sets up candidates for the election&lt;/li&gt;
+     *     &lt;li&gt;Implements threshold cryptography for secure vote tallying&lt;/li&gt;
+     *     &lt;li&gt;Manages the election through its phases (setup, registration, voting, tallying)&lt;/li&gt;
+     *     &lt;li&gt;Demonstrates voter registration and certificate issuance&lt;/li&gt;
+     *     &lt;li&gt;Demonstrates vote casting and error handling&lt;/li&gt;
+     *     &lt;li&gt;Demonstrates certificate revocation&lt;/li&gt;
+     *     &lt;li&gt;Coordinates vote anonymization through the mix network&lt;/li&gt;
+     *     &lt;li&gt;Demonstrates threshold decryption and results publication&lt;/li&gt;
+     * &lt;/ol&gt;
+     *
+     * @param args Command-line arguments
+     */
+
+    public static void main(String[] args) {
+<span class="nc" id="L64">        try (Scanner sc = new Scanner(System.in)) {</span>
+<span class="nc" id="L65">            String sessionId = UUID.randomUUID().toString();</span>
+<span class="nc" id="L66">            LoggingUtil.setTransactionContext(sessionId);</span>
+<span class="nc" id="L67">            logger.info(&quot;Starting e-voting system with session ID: {}&quot;, sessionId);</span>
+
+            // Initialize election manager
+<span class="nc" id="L70">            ElectionManager electionManager = new ElectionManager();</span>
+
+            // Initialize system components
+<span class="nc" id="L73">            RegistrationAuthority registrationAuthority = new RegistrationAuthority(electionManager);</span>
+<span class="nc" id="L74">            VotingServer votingServer = new VotingServer(registrationAuthority.getPublicKey(),</span>
+                    electionManager,
+<span class="nc" id="L76">                    registrationAuthority.getCrl());</span>
+
+<span class="nc" id="L78">            TallyingAuthority tallyingAuthority = new TallyingAuthority();</span>
+<span class="nc" id="L79">            MixNetwork mixNetwork = new MixNetwork(tallyingAuthority.getPublicKey());</span>
+<span class="nc" id="L80">            BallotBox ballotBox = new BallotBox(votingServer, mixNetwork, electionManager);</span>
+
+            // Initialize candidate manager and load candidates
+<span class="nc" id="L83">            CandidateManager candidateManager = new CandidateManager();</span>
+            // Create sample candidates file if it doesn't exist
+<span class="nc" id="L85">            createSampleCandidatesFile(&quot;candidates.txt&quot;);</span>
+
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (!candidateManager.loadCandidatesFromFile(&quot;candidates.txt&quot;)) {</span>
+<span class="nc" id="L88">                logger.warn(&quot;Failed to load candidates from file, using default candidates&quot;);</span>
+<span class="nc" id="L89">                candidateManager.addCandidate(&quot;Candidate1&quot;);</span>
+<span class="nc" id="L90">                candidateManager.addCandidate(&quot;Candidate2&quot;);</span>
+            }
+
+            // Initialize threshold cryptography (3 out of 5 shares needed)
+<span class="nc" id="L94">            logger.info(&quot;Initializing threshold cryptography for vote tallying&quot;);</span>
+<span class="nc" id="L95">            tallyingAuthority.splitKey(5, 3);</span>
+
+            // Share AA's public key with the voting server
+<span class="nc" id="L98">            votingServer.setAaPublicKey(tallyingAuthority.getPublicKey());</span>
+
+            // Start with setup phase
+<span class="nc" id="L101">            logger.info(&quot;System is in setup phase&quot;);</span>
+
+            // Transition to registration phase
+<span class="nc" id="L104">            electionManager.transitionTo(ElectionPhase.REGISTRATION);</span>
+<span class="nc" id="L105">            logger.info(&quot;System transitioned to registration phase&quot;);</span>
+
+
+            // Create and register voters
+<span class="nc" id="L109">            Voter voter1 = new Voter(VOTERS.get(0));</span>
+<span class="nc" id="L110">            Voter voter2 = new Voter(VOTERS.get(1));</span>
+<span class="nc" id="L111">            Voter voter3 = new Voter(VOTERS.get(2));</span>
+
+            // Register eligible voters with the Registration Authority
+<span class="nc" id="L114">            registrationAuthority.registerEligibleVoter(VOTERS.get(0));</span>
+<span class="nc" id="L115">            registrationAuthority.registerEligibleVoter(VOTERS.get(1));</span>
+<span class="nc" id="L116">            registrationAuthority.registerEligibleVoter(VOTERS.get(2));</span>
+<span class="nc" id="L117">            logger.info(&quot;Registered eligible voters with Registration Authority&quot;);</span>
+
+            // Register voters with the RA to get certificates
+<span class="nc" id="L120">            voter1.registerWithRA(registrationAuthority);</span>
+<span class="nc" id="L121">            voter2.registerWithRA(registrationAuthority);</span>
+<span class="nc" id="L122">            voter3.registerWithRA(registrationAuthority);</span>
+
+            // Export eligible voters list to a file for reference
+<span class="nc" id="L125">            registrationAuthority.exportEligibleVotersList(&quot;eligible_voters.txt&quot;);</span>
+
+            // Share eligible voters list with voting server
+<span class="nc" id="L128">            registrationAuthority.shareEligibleVotersListWithVotingServer(votingServer);</span>
+
+            // Set AA's public key with voters for vote encryption
+<span class="nc" id="L131">            voter1.setAaPublicKey(tallyingAuthority.getPublicKey());</span>
+<span class="nc" id="L132">            voter2.setAaPublicKey(tallyingAuthority.getPublicKey());</span>
+<span class="nc" id="L133">            voter3.setAaPublicKey(tallyingAuthority.getPublicKey());</span>
+
+            // Transition to voting phase
+<span class="nc" id="L136">            electionManager.transitionTo(ElectionPhase.VOTING);</span>
+<span class="nc" id="L137">            logger.info(&quot;System transitioned to voting phase&quot;);</span>
+
+            // Voting process with proper candidate validation and error handling
+<span class="nc" id="L140">            castVoteWithErrorHandling(voter1, votingServer, ballotBox, candidateManager, &quot;Candidate1&quot;);</span>
+<span class="nc" id="L141">            castVoteWithErrorHandling(voter2, votingServer, ballotBox, candidateManager, &quot;Candidate2&quot;);</span>
+<span class="nc" id="L142">            castVoteWithErrorHandling(voter3, votingServer, ballotBox, candidateManager, &quot;Candidate1&quot;);</span>
+
+            // This should now fail properly with &quot;Voter has already cast a vote&quot; error
+<span class="nc" id="L145">            castVoteWithErrorHandling(voter1, votingServer, ballotBox, candidateManager, &quot;Candidate2&quot;);</span>
+
+            // Try with an ineligible voter
+<span class="nc" id="L148">            testIneligibleVoter(registrationAuthority, votingServer, ballotBox, tallyingAuthority, candidateManager);</span>
+
+            // Certificate revocation example
+<span class="nc" id="L151">            logger.info(&quot;Testing certificate revocation functionality&quot;);</span>
+<span class="nc" id="L152">            registrationAuthority.revokeCertificate(voter3.getCertificateSerialNumber(), &quot;Voter requested revocation&quot;);</span>
+<span class="nc" id="L153">            registrationAuthority.removeEligibleVoter(VOTERS.get(2));</span>
+<span class="nc" id="L154">            registrationAuthority.shareEligibleVotersListWithVotingServer(votingServer);</span>
+<span class="nc" id="L155">            registrationAuthority.exportEligibleVotersList(&quot;eligible_voters.txt&quot;);</span>
+
+            // Prompt for election closing
+<span class="nc" id="L158">            logger.info(&quot;Press Enter to close the voting phase and start tallying...&quot;);</span>
+<span class="nc" id="L159">            sc.nextLine();</span>
+
+            // Transition to tallying phase
+<span class="nc" id="L162">            electionManager.transitionTo(ElectionPhase.TALLYING);</span>
+<span class="nc" id="L163">            logger.info(&quot;System transitioned to tallying phase&quot;);</span>
+
+            // Simulate gathering key shares for threshold decryption
+<span class="nc" id="L166">            logger.info(&quot;Simulating threshold cryptography key reconstruction&quot;);</span>
+<span class="nc" id="L167">            List&lt;KeyShare&gt; keyShares = tallyingAuthority.getKeyShares().subList(0, 3);</span>
+
+            // Use MixNetwork to anonymize votes before tallying
+<span class="nc" id="L170">            logger.info(&quot;Anonymizing votes through MixNetwork&quot;);</span>
+<span class="nc" id="L171">            List&lt;byte[]&gt; encryptedVotes = ballotBox.getEncryptedVotes();</span>
+
+            // Tally votes using the anonymized votes from MixNetwork
+<span class="nc" id="L174">            logger.info(&quot;Tallying results using threshold cryptography...&quot;);</span>
+<span class="nc" id="L175">            tallyingAuthority.decryptAndTallyVotes(encryptedVotes, keyShares);</span>
+
+            // Publish results
+<span class="nc" id="L178">            tallyingAuthority.publishResults();</span>
+
+<span class="nc" id="L180">            logger.info(&quot;E-voting process completed successfully&quot;);</span>
+<span class="nc" id="L181">        } catch (Exception e) {</span>
+<span class="nc" id="L182">            logger.error(&quot;Error in the voting process: {}&quot;, e.getMessage());</span>
+        } finally {
+<span class="nc" id="L184">            LoggingUtil.clearTransactionContext();</span>
+        }
+<span class="nc" id="L186">    }</span>
+
+    /**
+     * Attempts to cast a vote with comprehensive error handling.
+     * &lt;p&gt;
+     * This method:
+     * &lt;ol&gt;
+     *     &lt;li&gt;Validates that the candidate exists&lt;/li&gt;
+     *     &lt;li&gt;Attempts to cast a vote for the specified candidate&lt;/li&gt;
+     *     &lt;li&gt;Handles authentication failures (including duplicate voting attempts)&lt;/li&gt;
+     *     &lt;li&gt;Handles other unexpected exceptions during the voting process&lt;/li&gt;
+     * &lt;/ol&gt;
+     *
+     * @param voter The voter attempting to cast a vote
+     * @param votingServer The voting server for authentication
+     * @param ballotBox The ballot box for vote submission
+     * @param candidateManager The candidate manager for candidate validation
+     * @param candidateName The name of the candidate the voter is voting for
+     */
+
+    private static void castVoteWithErrorHandling(Voter voter, VotingServer votingServer,
+                                                  BallotBox ballotBox, CandidateManager candidateManager,
+                                                  String candidateName) {
+        try {
+            // Validate candidate first
+<span class="nc bnc" id="L211" title="All 2 branches missed.">            if (!candidateManager.isValidCandidate(candidateName)) {</span>
+<span class="nc" id="L212">                logger.warn(&quot;Invalid candidate choice: {}&quot;, candidateName);</span>
+<span class="nc" id="L213">                return;</span>
+            }
+
+<span class="nc" id="L216">            voter.vote(votingServer, ballotBox, candidateName);</span>
+<span class="nc" id="L217">        } catch (AuthenticationException e) {</span>
+            // Handle authentication failures (including duplicate voting)
+<span class="nc" id="L219">            logger.warn(&quot;Vote failed for voter {}: {}&quot;, voter.getId(), e.getMessage());</span>
+<span class="nc" id="L220">        } catch (Exception e) {</span>
+            // Handle other exceptions
+<span class="nc" id="L222">            logger.error(&quot;Unexpected error during voting for {}: {}&quot;, voter.getId(), e.getMessage());</span>
+<span class="nc" id="L223">        }</span>
+<span class="nc" id="L224">    }</span>
+
+    /**
+     * Tests the system's security by attempting to cast a vote with an ineligible voter.
+     * &lt;p&gt;
+     * This method demonstrates how the system handles unauthorized voting attempts,
+     * which is an important security feature of the e-voting system.
+     * &lt;p&gt;
+     * Sets a special &quot;SecurityAudit&quot; user context for logging these
+     * security events.
+     *
+     * @param ra The registration authority
+     * @param sv The voting server
+     * @param ue The ballot box
+     * @param aa The tallying authority
+     * @param candidateManager The candidate manager
+     */
+
+    private static void testIneligibleVoter(RegistrationAuthority ra, VotingServer sv, BallotBox ue,
+                                            TallyingAuthority aa, CandidateManager candidateManager) {
+<span class="nc" id="L244">        LoggingUtil.setUserContext(&quot;SecurityAudit&quot;);</span>
+        try {
+<span class="nc" id="L246">            Voter ineligibleVoter = new Voter(VOTERS.get(3));</span>
+<span class="nc" id="L247">            ineligibleVoter.registerWithRA(ra);</span>
+<span class="nc" id="L248">            ineligibleVoter.setAaPublicKey(aa.getPublicKey());</span>
+
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            if (candidateManager.isValidCandidate(&quot;Candidate3&quot;)) {</span>
+<span class="nc" id="L251">                ineligibleVoter.vote(sv, ue, &quot;Candidate3&quot;);</span>
+            } else {
+<span class="nc" id="L253">                ineligibleVoter.vote(sv, ue, candidateManager.getCandidates().get(0));</span>
+            }
+<span class="nc" id="L255">        } catch (Exception e) {</span>
+<span class="nc" id="L256">            logger.error(&quot;Prevented ineligible voter from voting: {}&quot;, e.getMessage());</span>
+        } finally {
+<span class="nc" id="L258">            LoggingUtil.clearUserContext();</span>
+        }
+<span class="nc" id="L260">    }</span>
+
+    /**
+     * Creates a sample candidates configuration file if it doesn't
+     * already exist.
+     * &lt;p&gt;
+     * The file contains a list of candidates, one per line, with comments
+     * preceded by '#' characters.
+     *
+     * @param filename The name of the candidates file to create
+     */
+
+    private static void createSampleCandidatesFile(String filename) {
+<span class="nc" id="L273">        File file = new File(filename);</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        if (!file.exists()) {</span>
+<span class="nc" id="L275">            try (FileWriter writer = new FileWriter(file)) {</span>
+<span class="nc" id="L276">                writer.write(&quot;# Candidate list configuration file\n&quot;);</span>
+<span class="nc" id="L277">                writer.write(&quot;Candidate1\n&quot;);</span>
+<span class="nc" id="L278">                writer.write(&quot;Candidate2\n&quot;);</span>
+<span class="nc" id="L279">                writer.write(&quot;Candidate3\n&quot;);</span>
+<span class="nc" id="L280">                logger.info(&quot;Created sample candidates file: {}&quot;, filename);</span>
+<span class="nc" id="L281">            } catch (IOException e) {</span>
+<span class="nc" id="L282">                logger.error(&quot;Failed to create sample candidates file: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L283">            }</span>
+        }
+<span class="nc" id="L285">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

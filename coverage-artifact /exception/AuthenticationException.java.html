@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthenticationException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pa-secure-evote</a> &gt; <a href="index.source.html" class="el_package">exception</a> &gt; <span class="el_source">AuthenticationException.java</span></div><h1>AuthenticationException.java</h1><pre class="source lang-java linenums">package exception;
+
+/**
+ * Exception thrown when authentication-related issues occur in the e-voting system.
+ * &lt;p&gt;
+ * This exception is thrown in scenarios such as:
+ * &lt;ul&gt;
+ *     &lt;li&gt;Invalid voter certificates&lt;/li&gt;
+ *     &lt;li&gt;Expired certificates&lt;/li&gt;
+ *     &lt;li&gt;Revoked certificates&lt;/li&gt;
+ *     &lt;li&gt;Invalid voting tokens&lt;/li&gt;
+ *     &lt;li&gt;Unauthorized access attempts&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * This exception may be thrown by components such as VotingServer or BallotBox
+ * during the validation of voter credentials or tokens.
+ */
+
+public class AuthenticationException extends EVotingException {
+
+    /**
+     * Constructs a new authentication exception with the specified detail message.
+     *
+     * @param message The detail message (which is saved for later retrieval by the getMessage() method)
+     */
+
+    public AuthenticationException(String message) {
+<span class="fc" id="L28">        super(message);</span>
+<span class="fc" id="L29">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

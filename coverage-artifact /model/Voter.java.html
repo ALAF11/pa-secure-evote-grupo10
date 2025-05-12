@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Voter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pa-secure-evote</a> &gt; <a href="index.source.html" class="el_package">model</a> &gt; <span class="el_source">Voter.java</span></div><h1>Voter.java</h1><pre class="source lang-java linenums">package model;
+
+import core.BallotBox;
+import core.RegistrationAuthority;
+import core.VotingServer;
+import crypto.CryptoUtils;
+import exception.AuthenticationException;
+import exception.VoteSubmissionException;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.slf4j.Logger;
+import util.LoggingUtil;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.security.*;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.util.UUID;
+
+/**
+ * Represents a voter in the e-voting system.
+ * &lt;p&gt;
+ * This class is responsible for:
+ * &lt;ul&gt;
+ *     &lt;li&gt;Generating cryptographic key pairs for voter authentication&lt;/li&gt;
+ *     &lt;li&gt;Obtaining certificates from the Registration Authority&lt;/li&gt;
+ *     &lt;li&gt;Authenticating with the Voting Server&lt;/li&gt;
+ *     &lt;li&gt;Encrypting and casting votes to the Ballot Box&lt;/li&gt;
+ *     &lt;li&gt;Managing certificate information&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * The Voter class implements retry logic for both registration and voting
+ * operations to handle transient failures.
+ */
+
+public class Voter {
+
+<span class="fc" id="L39">    private static final Logger logger = LoggingUtil.getLogger(Voter.class);</span>
+    private final String id;
+    private final KeyPair keyPair;
+    private X509Certificate certificate;
+    private String pemCertificate;
+    private PublicKey aaPublicKey;
+    private static final int MAX_RETRIES = 3;
+
+
+    /**
+     * Constructs a new Voter with the specified ID.
+     * &lt;p&gt;
+     * This constructor generates an RSA key pair for the voter to use
+     * in the registration and voting processes.
+     *
+     * @param id The unique identifier for this voter.
+     * @throws NoSuchAlgorithmException If the RSA algorithm is unavailable.
+     */
+
+<span class="fc" id="L58">    public Voter(String id) throws NoSuchAlgorithmException {</span>
+<span class="fc" id="L59">        this.id = id;</span>
+<span class="fc" id="L60">        LoggingUtil.setUserContext(id);</span>
+
+        try {
+<span class="fc" id="L63">            logger.debug(&quot;Creating new voter with ID: {}&quot;, id);</span>
+
+<span class="fc" id="L65">            KeyPairGenerator keyGen = KeyPairGenerator.getInstance(&quot;RSA&quot;);</span>
+<span class="fc" id="L66">            keyGen.initialize(2048, new SecureRandom());</span>
+<span class="fc" id="L67">            this.keyPair = keyGen.generateKeyPair();</span>
+
+<span class="fc" id="L69">            logger.debug(&quot;Key pair generated for voter: {}&quot;, id);</span>
+        }
+        finally {
+<span class="fc" id="L72">            LoggingUtil.clearUserContext();</span>
+        }
+<span class="fc" id="L74">    }</span>
+
+    /**
+     * Registers the voter with the Registration Authority to obtain a certificate.
+     * &lt;p&gt;
+     * This method implements retry logic to handle transient failures.
+     * After successful registration, the certificate is encoded in PEM format
+     * and exported to a local file.
+     *
+     * @param  ra The Registration Authority to register with.
+     * @throws OperatorCreationException If there is an error creating the certificate.
+     * @throws CertificateException If there is a problem with the certificate.
+     * @throws SecurityException If registration fails due to a security issue.
+     */
+
+    public void registerWithRA(RegistrationAuthority ra) throws OperatorCreationException, CertificateException {
+<span class="fc" id="L90">        String registrationId = &quot;REG_&quot; + UUID.randomUUID();</span>
+<span class="fc" id="L91">        LoggingUtil.setTransactionContext(registrationId);</span>
+<span class="fc" id="L92">        LoggingUtil.setUserContext(id);</span>
+
+        try {
+<span class="fc" id="L95">            logger.info(&quot;Voter {} requesting certificate from Registration Authority&quot;, id);</span>
+
+<span class="fc" id="L97">            int retryCount = 0;</span>
+<span class="fc" id="L98">            boolean registered = false;</span>
+
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            while (!registered) {</span>
+                try {
+<span class="fc" id="L102">                    this.certificate = ra.issueCertificate(this);</span>
+
+                    try {
+<span class="fc" id="L105">                        this.pemCertificate = CryptoUtils.encodeCertificateToPEM(certificate);</span>
+<span class="fc" id="L106">                        logger.info(&quot;Certificate encoded to PEM format for voter {}&quot;, id);</span>
+
+<span class="fc" id="L108">                        exportCertificateToFile(&quot;voter_&quot; + id + &quot;_cert.pem&quot;);</span>
+                    }
+<span class="nc" id="L110">                    catch (CertificateEncodingException | IOException e) {</span>
+<span class="nc" id="L111">                        logger.error(&quot;Failed to process PEM certificate: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L112">                    }</span>
+
+<span class="fc" id="L114">                    registered = true;</span>
+<span class="fc" id="L115">                    logger.info(&quot;Voter {} registered successfully&quot;, id);</span>
+                }
+<span class="fc" id="L117">                catch (SecurityException e) {</span>
+                    // Don't retry for security exception
+<span class="fc" id="L119">                    throw e;</span>
+                }
+<span class="nc" id="L121">                catch (Exception e) {</span>
+<span class="nc" id="L122">                    retryCount++;</span>
+<span class="nc" id="L123">                    logger.warn(&quot;Registration attempt {} failed for voter {}: {}&quot;,</span>
+<span class="nc" id="L124">                            retryCount, id, e.getMessage());</span>
+
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                    if (retryCount &lt; MAX_RETRIES) {</span>
+                        try {
+<span class="nc" id="L128">                            Thread.sleep(100 * (long) Math.pow(2, retryCount));</span>
+                        }
+<span class="nc" id="L130">                        catch (InterruptedException ie) {</span>
+<span class="nc" id="L131">                            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L132">                        }</span>
+                    }
+                    else {
+<span class="nc" id="L135">                        throw e;</span>
+                    }
+<span class="pc" id="L137">                }</span>
+            }
+        }
+        finally {
+<span class="fc" id="L141">            LoggingUtil.clearTransactionContext();</span>
+<span class="fc" id="L142">            LoggingUtil.clearUserContext();</span>
+        }
+<span class="fc" id="L144">    }</span>
+
+    /**
+     * Casts a vote for a specific candidate.
+     * &lt;p&gt;
+     * This method:
+     * &lt;ol&gt;
+     *     &lt;li&gt;Authenticates the voter with the Voting Server and obtains a token.&lt;/li&gt;
+     *     &lt;li&gt;Encrypts the vote using the Tallying Authority's public key.&lt;/li&gt;
+     *     &lt;li&gt;Signs a hash of the vote to ensure non-repudiation.&lt;/li&gt;
+     *     &lt;li&gt;Submits the encrypted vote to the Ballot Box.&lt;/li&gt;
+     * &lt;/ol&gt;
+     * Implements retry logic in case of transient failures during voting.
+     *
+     * @param votingServer The Voting Server used to authenticate the voter.
+     * @param ballotBox The Ballot Box to which the vote is submitted.
+     * @param choice The candidate selected by the voter.
+     * @throws AuthenticationException If authentication with the Voting Server fails.
+     * @throws VoteSubmissionException If vote submission fails after retries.
+     * @throws IllegalStateException If the voter is not registered or AA public key is not set.
+     */
+
+    public void vote(VotingServer votingServer, BallotBox ballotBox, String choice) throws Exception {
+<span class="fc" id="L167">        String voteId = &quot;VOTE_&quot; + UUID.randomUUID();</span>
+<span class="fc" id="L168">        LoggingUtil.setTransactionContext(voteId);</span>
+<span class="fc" id="L169">        LoggingUtil.setUserContext(id);</span>
+
+        try {
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (certificate == null) {</span>
+<span class="fc" id="L173">                throw new IllegalStateException(&quot;Voter must be registered before voting&quot;);</span>
+            }
+
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (aaPublicKey == null) {</span>
+<span class="fc" id="L177">                throw new IllegalStateException(&quot;Tallying Authority public key not set&quot;);</span>
+            }
+
+<span class="fc" id="L180">            logger.info(&quot;Voter {} initiating voting process&quot;, id);</span>
+
+            // Create vote hash for non-repudiation
+<span class="fc" id="L183">            byte[] voteHash = CryptoUtils.hash(choice.getBytes());</span>
+<span class="fc" id="L184">            byte[] signature = CryptoUtils.sign(voteHash, keyPair.getPrivate());</span>
+
+            // Implement retry logic for voting
+<span class="fc" id="L187">            int retryCount = 0;</span>
+<span class="fc" id="L188">            boolean voted = false;</span>
+
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            while (!voted) {</span>
+                try {
+                    // Authenticate with voting server
+<span class="fc" id="L193">                    String token = votingServer.authenticateVoter(certificate);</span>
+<span class="fc" id="L194">                    logger.debug(&quot;Voter {} authenticated and received token&quot;, id);</span>
+
+                    // Encrypt vote
+<span class="fc" id="L197">                    byte[] encryptedVote = CryptoUtils.encryptVote(choice, aaPublicKey);</span>
+<span class="fc" id="L198">                    logger.debug(&quot;Vote encrypted successfully&quot;);</span>
+
+                    // Submit vote to ballot box
+<span class="fc" id="L201">                    ballotBox.submitVote(encryptedVote, token, signature);</span>
+<span class="fc" id="L202">                    voted = true;</span>
+<span class="fc" id="L203">                    logger.info(&quot;Voter {} has cast a vote successfully&quot;, id);</span>
+
+<span class="fc" id="L205">                } catch (AuthenticationException | VoteSubmissionException e) {</span>
+<span class="fc" id="L206">                    throw e;</span>
+<span class="nc" id="L207">                } catch (Exception e) {</span>
+<span class="nc" id="L208">                    retryCount++;</span>
+<span class="nc" id="L209">                    logger.warn(&quot;Voting attempt {} failed for voter {}: {}&quot;,</span>
+<span class="nc" id="L210">                            retryCount, id, e.getMessage());</span>
+
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                    if (retryCount &lt; MAX_RETRIES) {</span>
+                        try {
+<span class="nc" id="L214">                            Thread.sleep(100 * (long) Math.pow(2, retryCount));</span>
+<span class="nc" id="L215">                        } catch (InterruptedException ie) {</span>
+<span class="nc" id="L216">                            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L217">                        }</span>
+                    } else {
+<span class="nc" id="L219">                        throw new VoteSubmissionException(&quot;Voting failed after multiple attempts&quot;, e);</span>
+                    }
+<span class="pc" id="L221">                }</span>
+            }
+        } finally {
+<span class="fc" id="L224">            LoggingUtil.clearTransactionContext();</span>
+<span class="fc" id="L225">            LoggingUtil.clearUserContext();</span>
+        }
+<span class="fc" id="L227">    }</span>
+
+    /**
+     * Retrieves the serial number of the voter's certificate.
+     *
+     * @return The certificate serial number as a string.
+     * @throws IllegalStateException If the certificate has not been issued yet.
+     */
+
+    public String getCertificateSerialNumber() {
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        if (certificate == null) {</span>
+<span class="nc" id="L238">            throw new IllegalStateException(&quot;Voter does not have a certificate&quot;);</span>
+        }
+
+<span class="nc" id="L241">        return certificate.getSerialNumber().toString();</span>
+    }
+
+    /**
+     * Exports the voter's PEM-encoded certificate to the specified file path.
+     *
+     * @param filePath The file path where the PEM certificate should be saved.
+     * @throws IOException If an I/O error occurs while writing the file.
+     * @throws IllegalStateException If the PEM certificate is not available.
+     */
+
+    public void exportCertificateToFile(String filePath) throws IOException {
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        if (pemCertificate == null) {</span>
+<span class="fc" id="L254">            throw new IllegalStateException(&quot;Certificate not available in PEM format&quot;);</span>
+        }
+
+<span class="nc" id="L257">        try (FileWriter writer = new FileWriter(filePath)) {</span>
+<span class="nc" id="L258">            writer.write(pemCertificate);</span>
+        }
+<span class="nc" id="L260">        logger.info(&quot;Certificate exported to PEM file: {}&quot;, filePath);</span>
+<span class="nc" id="L261">    }</span>
+
+    /**
+     * Sets the Tallying Authority's public key, used for encrypting votes.
+     *
+     * @param aaPublicKey The public key of the Tallying Authority.
+     */
+
+    public void setAaPublicKey(PublicKey aaPublicKey) {
+<span class="fc" id="L270">        this.aaPublicKey = aaPublicKey;</span>
+<span class="fc" id="L271">    }</span>
+
+     /**
+     * Returns the unique identifier of the voter.
+     *
+     * @return The voter ID.
+     */
+
+
+    public String getId() {
+<span class="fc" id="L281">        return id;</span>
+    }
+
+    /**
+     * Returns the public key associated with the voter.
+     *
+     * @return The voter's public key.
+     */
+
+
+    public PublicKey getPublicKey() {
+<span class="fc" id="L292">        return keyPair.getPublic();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TallyingAuthority.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pa-secure-evote</a> &gt; <a href="index.source.html" class="el_package">core</a> &gt; <span class="el_source">TallyingAuthority.java</span></div><h1>TallyingAuthority.java</h1><pre class="source lang-java linenums">package core;
+
+import exception.EVotingException;
+import model.KeyShare;
+import org.slf4j.Logger;
+import util.LoggingUtil;
+
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.SecureRandom;
+import java.security.interfaces.RSAPrivateCrtKey;
+import java.security.spec.RSAPrivateKeySpec;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Represents the Tallying Authority in the e-voting system.
+ * &lt;p&gt;
+ * This class is responsible for:
+ * &lt;ul&gt;
+ *     &lt;li&gt;Decrypting and tallying votes after the election concludes&lt;/li&gt;
+ *     &lt;li&gt;Implementing key sharing for threshold cryptography&lt;/li&gt;
+ *     &lt;li&gt;Publishing election results&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * The Tallying Authority uses a secret sharing scheme (Shamir's Secret Sharing)
+ * to split its private key into multiple shares, requiring a threshold number
+ * of shares to reconstruct the key for vote decryption.
+ */
+
+public class TallyingAuthority {
+<span class="fc" id="L44">    private static final Logger logger = LoggingUtil.getLogger(TallyingAuthority.class);</span>
+    private final KeyPair keyPair;
+<span class="fc" id="L46">    private final Map&lt;String, Integer&gt; results = new HashMap&lt;&gt;();</span>
+    private final BigInteger prime;
+    private List&lt;KeyShare&gt; keyShares;
+    private BigInteger privateKeyBigInt;
+    private final BigInteger modulus; // Store the modulus for reconstruction
+
+    /**
+     * Constructs a new Tallying Authority with RSA key pair.
+     *
+     * @throws NoSuchAlgorithmException If the RSA algorithm is not available
+     */
+
+<span class="fc" id="L58">    public TallyingAuthority() throws NoSuchAlgorithmException {</span>
+<span class="fc" id="L59">        logger.info(&quot;Initializing Tallying Authority&quot;);</span>
+
+        // Generate the Tallying Authority's key pair
+<span class="fc" id="L62">        KeyPairGenerator keyGen = KeyPairGenerator.getInstance(&quot;RSA&quot;);</span>
+<span class="fc" id="L63">        keyGen.initialize(2048, new SecureRandom());</span>
+<span class="fc" id="L64">        this.keyPair = keyGen.generateKeyPair();</span>
+
+        // Initialize prime for secret sharing
+<span class="fc" id="L67">        this.prime = BigInteger.valueOf(2).pow(2048).subtract(BigInteger.ONE);</span>
+
+        // Extract modulus and private exponent from the RSA key pair
+<span class="fc" id="L70">        RSAPrivateCrtKey rsaKey = (RSAPrivateCrtKey) keyPair.getPrivate();</span>
+<span class="fc" id="L71">        this.modulus = rsaKey.getModulus();</span>
+<span class="fc" id="L72">        this.privateKeyBigInt = rsaKey.getPrivateExponent();</span>
+
+<span class="fc" id="L74">        logger.info(&quot;Tallying Authority initialized successfully&quot;);</span>
+<span class="fc" id="L75">    }</span>
+
+    /**
+     * Splits the private key into multiple shares using Shamir's Secret Sharing.
+     * &lt;p&gt;
+     * This implements a threshold cryptography scheme were at least 'k' out of 'n'
+     * shares are required to reconstruct the private key.
+     *
+     * @param n The total number of shares to create
+     * @param k The threshold number of shares required for reconstruction
+     * @throws IllegalArgumentException If n is less than k
+     */
+
+    public void splitKey(int n, int k) {
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (n &lt; k) {</span>
+<span class="fc" id="L90">            throw new IllegalArgumentException(&quot;Total shares (n) must be greater than or equal to threshold (k)&quot;);</span>
+        }
+
+<span class="fc" id="L93">        logger.info(&quot;Splitting private key into {} shares with threshold {}&quot;, n, k);</span>
+
+<span class="fc" id="L95">        SecureRandom random = new SecureRandom();</span>
+<span class="fc" id="L96">        keyShares = new ArrayList&lt;&gt;();</span>
+
+        // Generate random coefficients for the polynomial
+<span class="fc" id="L99">        BigInteger[] coefficients = new BigInteger[k];</span>
+<span class="fc" id="L100">        coefficients[0] = privateKeyBigInt; // The secret is the constant term</span>
+
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (int i = 1; i &lt; k; i++) {</span>
+<span class="fc" id="L103">            coefficients[i] = new BigInteger(prime.bitLength() - 1, random);</span>
+        }
+
+        // Generate shares
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (int i = 1; i &lt;= n; i++) {</span>
+            // Evaluate polynomial at point i
+<span class="fc" id="L109">            BigInteger x = BigInteger.valueOf(i);</span>
+<span class="fc" id="L110">            BigInteger y = coefficients[0];</span>
+
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            for (int j = 1; j &lt; k; j++) {</span>
+<span class="fc" id="L113">                BigInteger term = coefficients[j].multiply(x.pow(j)).mod(prime);</span>
+<span class="fc" id="L114">                y = y.add(term).mod(prime);</span>
+            }
+
+<span class="fc" id="L117">            keyShares.add(new KeyShare(i, y, prime));</span>
+        }
+
+<span class="fc" id="L120">        logger.info(&quot;Key splitting completed successfully&quot;);</span>
+<span class="fc" id="L121">    }</span>
+
+    /**
+     * Reconstructs the private key from provided shares.
+     *
+     * @param shares The key shares for reconstruction
+     * @return The reconstructed private exponent
+     */
+
+    private BigInteger reconstructKey(List&lt;KeyShare&gt; shares) {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (shares.size() &lt; 2) {</span>
+<span class="fc" id="L132">            throw new IllegalArgumentException(&quot;At least 2 shares are required for reconstruction&quot;);</span>
+        }
+
+<span class="fc" id="L135">        logger.info(&quot;Reconstructing private key from {} shares&quot;, shares.size());</span>
+
+<span class="fc" id="L137">        BigInteger reconstructed = BigInteger.ZERO;</span>
+
+
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        for (int i = 0; i &lt; shares.size(); i++) {</span>
+<span class="fc" id="L141">            KeyShare share = shares.get(i);</span>
+<span class="fc" id="L142">            BigInteger numerator = BigInteger.ONE;</span>
+<span class="fc" id="L143">            BigInteger denominator = BigInteger.ONE;</span>
+
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            for (int j = 0; j &lt; shares.size(); j++) {</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                if (i != j) {</span>
+<span class="fc" id="L147">                    KeyShare other = shares.get(j);</span>
+<span class="fc" id="L148">                    BigInteger iValue = BigInteger.valueOf(share.getX());</span>
+<span class="fc" id="L149">                    BigInteger jValue = BigInteger.valueOf(other.getX());</span>
+
+<span class="fc" id="L151">                    numerator = numerator.multiply(jValue.negate()).mod(prime);</span>
+<span class="fc" id="L152">                    denominator = denominator.multiply(iValue.subtract(jValue)).mod(prime);</span>
+                }
+            }
+
+<span class="fc" id="L156">            BigInteger inverseDenominator = denominator.modInverse(prime);</span>
+<span class="fc" id="L157">            BigInteger delta = numerator.multiply(inverseDenominator).mod(prime);</span>
+<span class="fc" id="L158">            BigInteger term = share.getY().multiply(delta).mod(prime);</span>
+
+<span class="fc" id="L160">            reconstructed = reconstructed.add(term).mod(prime);</span>
+        }
+
+<span class="fc" id="L163">        logger.info(&quot;Key reconstruction completed successfully&quot;);</span>
+<span class="fc" id="L164">        return reconstructed;</span>
+    }
+
+    /**
+     * Converts a BigInteger to PrivateKey.
+     *
+     * @param privateExponent The private exponent to convert
+     * @return The PrivateKey instance
+     * @throws EVotingException If conversion fails
+     */
+
+    private PrivateKey convertToPrivateKey(BigInteger privateExponent) {
+        try {
+<span class="fc" id="L177">            RSAPrivateKeySpec keySpec = new RSAPrivateKeySpec(modulus, privateExponent);</span>
+<span class="fc" id="L178">            KeyFactory keyFactory = KeyFactory.getInstance(&quot;RSA&quot;);</span>
+<span class="fc" id="L179">            return keyFactory.generatePrivate(keySpec);</span>
+<span class="nc" id="L180">        } catch (Exception e) {</span>
+<span class="nc" id="L181">            throw new EVotingException(&quot;Failed to convert private exponent to key&quot;, e);</span>
+        }
+    }
+
+    /**
+     * Decrypts and tallies the votes using the reconstructed private key.
+     * &lt;p&gt;
+     * This method requires a threshold number of key shares to reconstruct
+     * the private key before decryption can occur.
+     *
+     * @param encryptedVotes The list of encrypted votes to tally
+     * @param shares The list of key shares for private key reconstruction
+     */
+
+    public void decryptAndTallyVotes(List&lt;byte[]&gt; encryptedVotes, List&lt;KeyShare&gt; shares) {
+<span class="fc" id="L196">        String transactionId = &quot;TALLY_&quot; + UUID.randomUUID();</span>
+<span class="fc" id="L197">        LoggingUtil.setTransactionContext(transactionId);</span>
+
+        try {
+<span class="fc" id="L200">            logger.info(&quot;Starting vote tallying process&quot;);</span>
+
+            // Clear previous results
+<span class="fc" id="L203">            results.clear();</span>
+
+            // Reconstruct the private key from shares
+<span class="fc" id="L206">            BigInteger reconstructedKey = reconstructKey(shares);</span>
+
+            // Convert reconstructed key to PrivateKey object
+<span class="fc" id="L209">            PrivateKey privateKey = convertToPrivateKey(reconstructedKey);</span>
+<span class="fc" id="L210">            logger.info(&quot;Successfully converted reconstructed key to PrivateKey&quot;);</span>
+
+<span class="fc" id="L212">            logger.info(&quot;Decrypting {} votes&quot;, encryptedVotes.size());</span>
+
+            // Decrypt and tally each vote using the reconstructed key
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            for (byte[] encryptedVote : encryptedVotes) {</span>
+                try {
+<span class="fc" id="L217">                    String decryptedVote = decryptVote(encryptedVote, privateKey);</span>
+
+                    // Update tally
+<span class="fc" id="L220">                    results.put(decryptedVote, results.getOrDefault(decryptedVote, 0) + 1);</span>
+<span class="nc" id="L221">                } catch (Exception e) {</span>
+<span class="nc" id="L222">                    logger.warn(&quot;Failed to decrypt vote: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L223">                }</span>
+<span class="fc" id="L224">            }</span>
+
+<span class="fc" id="L226">            logger.info(&quot;Vote tallying completed successfully&quot;);</span>
+        } finally {
+<span class="fc" id="L228">            LoggingUtil.clearTransactionContext();</span>
+        }
+<span class="fc" id="L230">    }</span>
+
+    /**
+     * Decrypts a single encrypted vote using the private key.
+     *
+     * @param encryptedVote The encrypted vote
+     * @param privateKey The private key for decryption
+     * @return The decrypted vote
+     * @throws EVotingException If decryption fails
+     */
+
+    private String decryptVote(byte[] encryptedVote, PrivateKey privateKey) {
+        try {
+            // Parse encrypted vote components
+<span class="fc" id="L244">            ByteBuffer buffer = ByteBuffer.wrap(encryptedVote);</span>
+
+            // Extract encrypted key
+<span class="fc" id="L247">            int keyLength = buffer.getInt();</span>
+<span class="fc" id="L248">            byte[] encryptedKey = new byte[keyLength];</span>
+<span class="fc" id="L249">            buffer.get(encryptedKey);</span>
+
+            // Extract IV
+<span class="fc" id="L252">            int ivLength = buffer.getInt();</span>
+<span class="fc" id="L253">            byte[] iv = new byte[ivLength];</span>
+<span class="fc" id="L254">            buffer.get(iv);</span>
+
+            // Extract encrypted vote
+<span class="fc" id="L257">            int voteLength = buffer.getInt();</span>
+<span class="fc" id="L258">            byte[] encryptedVoteData = new byte[voteLength];</span>
+<span class="fc" id="L259">            buffer.get(encryptedVoteData);</span>
+
+            // Decrypt AES key using the reconstructed RSA private key
+<span class="fc" id="L262">            Cipher rsaCipher = Cipher.getInstance(&quot;RSA/ECB/OAEPWithSHA-256AndMGF1Padding&quot;);</span>
+<span class="fc" id="L263">            rsaCipher.init(Cipher.DECRYPT_MODE, privateKey);</span>
+<span class="fc" id="L264">            byte[] decryptedKey = rsaCipher.doFinal(encryptedKey);</span>
+
+            // Decrypt vote using AES key
+<span class="fc" id="L267">            SecretKeySpec aesKey = new SecretKeySpec(decryptedKey, &quot;AES&quot;);</span>
+<span class="fc" id="L268">            Cipher aesCipher = Cipher.getInstance(&quot;AES/GCM/NoPadding&quot;);</span>
+<span class="fc" id="L269">            GCMParameterSpec gcmParams = new GCMParameterSpec(128, iv);</span>
+<span class="fc" id="L270">            aesCipher.init(Cipher.DECRYPT_MODE, aesKey, gcmParams);</span>
+<span class="fc" id="L271">            byte[] decryptedVoteBytes = aesCipher.doFinal(encryptedVoteData);</span>
+
+<span class="fc" id="L273">            return new String(decryptedVoteBytes);</span>
+<span class="nc" id="L274">        } catch (Exception e) {</span>
+<span class="nc" id="L275">            throw new EVotingException(&quot;Vote decryption failed&quot;, e);</span>
+        }
+    }
+
+    /**
+     * Publishes the election results.
+     * &lt;p&gt;
+     * Generates a formatted report of the election results including
+     * the number of votes for each candidate.
+     */
+
+    public void publishResults() {
+<span class="fc" id="L287">        logger.info(&quot;Publishing election results&quot;);</span>
+<span class="fc" id="L288">        StringBuilder report = new StringBuilder();</span>
+
+<span class="fc" id="L290">        report.append(&quot;==== ELECTION RESULTS ====\n&quot;);</span>
+<span class="fc" id="L291">        report.append(&quot;Report generated at: &quot;).append(Instant.now()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L292">        report.append(&quot;Total votes: &quot;).append(results.values().stream().mapToInt(Integer::intValue).sum()).append(&quot;\n\n&quot;);</span>
+
+<span class="fc" id="L294">        results.forEach((candidate, count) -&gt;</span>
+<span class="fc" id="L295">                report.append(candidate).append(&quot;: &quot;).append(count).append(&quot; votes\n&quot;));</span>
+
+<span class="fc" id="L297">        report.append(&quot;==========================&quot;);</span>
+
+<span class="fc" id="L299">        logger.debug(&quot;{}&quot;, report);</span>
+<span class="fc" id="L300">        logger.info(&quot;Results published successfully&quot;);</span>
+<span class="fc" id="L301">    }</span>
+
+    /**
+     * Gets the public key for the Tallying Authority.
+     *
+     * @return The public key
+     */
+
+    public java.security.PublicKey getPublicKey() {
+<span class="fc" id="L310">        return keyPair.getPublic();</span>
+    }
+
+    /**
+     * Gets all key shares.
+     *
+     * @return List of key shares
+     */
+
+    public List&lt;KeyShare&gt; getKeyShares() {
+<span class="fc" id="L320">        return new ArrayList&lt;&gt;(keyShares);</span>
+    }
+
+    /**
+     * Gets the election results.
+     *
+     * @return A map containing candidates and their vote counts
+     */
+
+    public Map&lt;String, Integer&gt; getResults() {
+<span class="fc" id="L330">        return new HashMap&lt;&gt;(results);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
