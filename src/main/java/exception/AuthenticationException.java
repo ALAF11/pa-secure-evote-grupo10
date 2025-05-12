@@ -12,7 +12,7 @@ package exception;
  *     <li>Unauthorized access attempts</li>
  * </ul>
  * <p>
- * This exception may be thrown by components such as {@code VotingServer} or {@code BallotBox}
+ * This exception may be thrown by components such as VotingServer or BallotBox
  * during the validation of voter credentials or tokens.
  */
 
