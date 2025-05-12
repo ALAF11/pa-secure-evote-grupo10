@@ -1,14 +1,10 @@
 package crypto;
 
+import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.SecureRandom;
-import java.security.Signature;
+import java.security.*;
 import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
 import javax.crypto.BadPaddingException;
@@ -71,6 +67,18 @@ public class CryptoUtils {
         pem.append("-----END CERTIFICATE-----");
         return pem.toString();
 
+    }
+
+    public static X509Certificate decodeCertificateFromPEM(String pemCertificate) throws GeneralSecurityException {
+        String base64Cert = pemCertificate
+                .replace("-----BEGIN CERTIFICATE-----", "")
+                .replace("-----END CERTIFICATE-----", "")
+                .replaceAll("\\s", "");
+
+        byte[] decoded = Base64.getDecoder().decode(base64Cert);
+
+        CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
+        return (X509Certificate) certFactory.generateCertificate(new ByteArrayInputStream(decoded));
     }
 
     public static byte[] hash(byte[] message) throws NoSuchAlgorithmException {
