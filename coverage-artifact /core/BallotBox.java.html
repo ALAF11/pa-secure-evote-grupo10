@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BallotBox.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pa-secure-evote</a> &gt; <a href="index.source.html" class="el_package">core</a> &gt; <span class="el_source">BallotBox.java</span></div><h1>BallotBox.java</h1><pre class="source lang-java linenums">package core;
+
+import crypto.MixNetwork;
+import exception.AuthenticationException;
+import exception.VoteSubmissionException;
+import model.ElectionManager;
+import model.ElectionPhase;
+import org.slf4j.Logger;
+import util.LoggingUtil;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.*;
+
+/**
+ * Represents an electronic ballot box for securely storing encrypted votes.
+ * &lt;p&gt;
+ * This class is responsible for:
+ * &lt;ul&gt;
+ *     &lt;li&gt;Accepting and validating vote submissions&lt;/li&gt;
+ *     &lt;li&gt;Preventing duplicate voting through token validation&lt;/li&gt;
+ *     &lt;li&gt;Storing encrypted votes securely&lt;/li&gt;
+ *     &lt;li&gt;Providing encrypted votes for tallying after the voting phase ends&lt;/li&gt;
+ *     &lt;li&gt;Implementing retry logic for transient failures during vote submission&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * The BallotBox works with the VotingServer to validate voter tokens and
+ * with the MixNetwork to anonymize votes before they are tallied.
+ */
+
+public class BallotBox {
+
+<span class="fc" id="L31">    private static final Logger logger = LoggingUtil.getLogger(BallotBox.class);</span>
+    private final List&lt;byte[]&gt; encryptedVotes;
+    private final Set&lt;String&gt; usedTokens;
+    private final VotingServer votingServer;
+    private final List&lt;byte[]&gt; voteSignatures; // For non-repudiation
+    private final MixNetwork mixNetwork;
+    private final ElectionManager electionManager;
+    private static final int MAX_RETRIES = 3;
+
+    /**
+     * Constructs a new BallotBox with the specified dependencies.
+     *
+     * @param votingServer The voting server responsible for token validation
+     * @param mixNetwork The mix network for anonymizing votes
+     * @param electionManager The election manager for phase control
+     */
+
+<span class="fc" id="L48">    public BallotBox(VotingServer votingServer, MixNetwork mixNetwork, ElectionManager electionManager) {</span>
+<span class="fc" id="L49">        logger.info(&quot;Initializing BallotBox&quot;);</span>
+<span class="fc" id="L50">        this.votingServer = votingServer;</span>
+<span class="fc" id="L51">        this.mixNetwork = mixNetwork;</span>
+<span class="fc" id="L52">        this.electionManager = electionManager;</span>
+<span class="fc" id="L53">        this.encryptedVotes = Collections.synchronizedList(new ArrayList&lt;&gt;());</span>
+<span class="fc" id="L54">        this.usedTokens = ConcurrentHashMap.newKeySet();</span>
+<span class="fc" id="L55">        this.voteSignatures = Collections.synchronizedList(new ArrayList&lt;&gt;());</span>
+<span class="fc" id="L56">    }</span>
+
+
+    /**
+     * Submits an encrypted vote to the ballot box.
+     * &lt;p&gt;
+     * This method validates the voting token, checks for duplicate token use,
+     * and implements retry logic for handling transient errors.
+     *
+     * @param encryptedVote The encrypted vote data
+     * @param token The voting token issued by the voting server
+     * @param signature The voter's signature for non-repudiation
+     * @throws VoteSubmissionException If the vote cannot be submitted
+     * @throws AuthenticationException If the token is invalid
+     */
+
+    public synchronized void submitVote(byte[] encryptedVote, String token, byte[] signature) {
+<span class="fc" id="L73">        String transactionId = &quot;SUBMIT_&quot; + UUID.randomUUID();</span>
+<span class="fc" id="L74">        LoggingUtil.setTransactionContext(transactionId);</span>
+
+        // Check election phase
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (!electionManager.isInPhase(ElectionPhase.VOTING)) {</span>
+<span class="fc" id="L78">            logger.warn(&quot;Vote rejected: voting is not currently active&quot;);</span>
+<span class="fc" id="L79">            LoggingUtil.clearTransactionContext();</span>
+<span class="fc" id="L80">            throw new VoteSubmissionException(&quot;Voting is not currently active&quot;);</span>
+        }
+
+        // Implement retry logic
+<span class="fc" id="L84">        int retryCount = 0;</span>
+<span class="fc" id="L85">        boolean submitted = false;</span>
+
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        while (!submitted) {</span>
+            try {
+<span class="fc" id="L89">                logger.debug(&quot;Validating vote submission with token&quot;);</span>
+
+                // Check if token is valid
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                if (!votingServer.validateToken(token)) {</span>
+<span class="fc" id="L93">                    logger.warn(&quot;Vote rejected: invalid token&quot;);</span>
+<span class="fc" id="L94">                    throw new AuthenticationException(&quot;Invalid voting token&quot;);</span>
+                }
+
+                // Check for duplicate token use
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                if (usedTokens.contains(token)) {</span>
+<span class="fc" id="L99">                    logger.warn(&quot;Vote rejected: token has already been used&quot;);</span>
+<span class="fc" id="L100">                    throw new VoteSubmissionException(&quot;Token has already been used&quot;);</span>
+                }
+
+                // Store vote, signature, and mark token as used
+<span class="fc" id="L104">                encryptedVotes.add(encryptedVote);</span>
+<span class="fc" id="L105">                voteSignatures.add(signature);</span>
+<span class="fc" id="L106">                usedTokens.add(token);</span>
+<span class="fc" id="L107">                votingServer.markTokenAsUsed(token);</span>
+
+<span class="fc" id="L109">                logger.info(&quot;Vote accepted successfully&quot;);</span>
+<span class="fc" id="L110">                submitted = true;</span>
+<span class="fc" id="L111">            } catch (AuthenticationException | VoteSubmissionException e) {</span>
+                // No retry for client errors
+<span class="fc" id="L113">                LoggingUtil.clearTransactionContext();</span>
+<span class="fc" id="L114">                throw e;</span>
+<span class="fc" id="L115">            } catch (Exception e) {</span>
+                // Retry for server/network errors
+<span class="fc" id="L117">                retryCount++;</span>
+<span class="fc" id="L118">                logger.warn(&quot;Vote submission attempt {} failed: {}&quot;, retryCount, e.getMessage());</span>
+
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                if (retryCount &lt; MAX_RETRIES) {</span>
+                    try {
+<span class="fc" id="L122">                        wait(100 * (long) Math.pow(2, retryCount));</span>
+<span class="nc" id="L123">                    } catch (InterruptedException ie) {</span>
+<span class="nc" id="L124">                        Thread.currentThread().interrupt();</span>
+<span class="pc" id="L125">                    }</span>
+                } else {
+<span class="nc" id="L127">                    LoggingUtil.clearTransactionContext();</span>
+<span class="nc" id="L128">                    throw new VoteSubmissionException(&quot;Vote submission failed after multiple attempts&quot;, e);</span>
+                }
+<span class="fc" id="L130">            }</span>
+        }
+
+<span class="fc" id="L133">        LoggingUtil.clearTransactionContext();</span>
+<span class="fc" id="L134">    }</span>
+
+    /**
+     * Retrieves the signature for a specific vote.
+     *
+     * @param index The index of the vote
+     * @return The signature for the specified vote
+     * @throws IndexOutOfBoundsException If the index is out of range
+     */
+
+    public byte[] getVoteSignature(int index) {
+<span class="pc bpc" id="L145" title="1 of 4 branches missed.">        if (index &lt; 0 || index &gt;= voteSignatures.size()) {</span>
+<span class="fc" id="L146">            throw new IndexOutOfBoundsException(&quot;Invalid vote index&quot;);</span>
+        }
+
+<span class="fc" id="L149">        return voteSignatures.get(index);</span>
+    }
+
+    /**
+     * Retrieves all encrypted votes for tallying.
+     * &lt;p&gt;
+     * This method uses the mix network to anonymize votes before returning them.
+     * Can only be called after the voting phase has ended.
+     *
+     * @return A list of anonymized encrypted votes
+     * @throws SecurityException If called during the voting phase
+     */
+
+    public List&lt;byte[]&gt; getEncryptedVotes() {
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (electionManager.isInPhase(ElectionPhase.VOTING)) {</span>
+<span class="fc" id="L164">            logger.warn(&quot;Attempt to access votes during voting phase&quot;);</span>
+<span class="fc" id="L165">            throw new SecurityException(&quot;Votes can only be accessed after voting has ended&quot;);</span>
+        }
+
+<span class="fc" id="L168">        logger.info(&quot;Providing {} encrypted votes for tallying&quot;, encryptedVotes.size());</span>
+
+        // Use mix network to anonymize votes before tallying
+<span class="fc" id="L171">        return mixNetwork.mixVotes(encryptedVotes);</span>
+    }
+
+    /**
+     * Returns the total number of votes collected
+     *
+     * @return The number of votes
+     */
+
+    public int getVoteCount() {
+<span class="fc" id="L181">        return encryptedVotes.size();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

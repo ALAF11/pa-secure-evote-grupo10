@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CandidateManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pa-secure-evote</a> &gt; <a href="index.source.html" class="el_package">model</a> &gt; <span class="el_source">CandidateManager.java</span></div><h1>CandidateManager.java</h1><pre class="source lang-java linenums">package model;
+
+import org.slf4j.Logger;
+import util.LoggingUtil;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * Manages the list of candidates for the e-voting system.
+ * &lt;p&gt;
+ * This class provides functionality to:
+ * &lt;ul&gt;
+ *     &lt;li&gt;Load candidate names from configuration files&lt;/li&gt;
+ *     &lt;li&gt;Add candidates dynamically&lt;/li&gt;
+ *     &lt;li&gt;Provide an immutable list of candidates&lt;/li&gt;
+ *     &lt;li&gt;Validate if a candidate is registered&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * Once loaded, the list of candidates is immutable externally,
+ * ensuring the integrity of the election process.
+ */
+
+<span class="fc" id="L28">public class CandidateManager {</span>
+
+<span class="fc" id="L30">    private static final Logger logger = LoggingUtil.getLogger(CandidateManager.class);</span>
+<span class="fc" id="L31">    private final List&lt;String&gt; candidates = new ArrayList&lt;&gt;();</span>
+
+    /**
+     * Loads candidate names from a configuration file.
+     * &lt;p&gt;
+     * Each line in the file should contain one candidate name.
+     * Lines beginning with '#' are treated as comments and ignored.
+     * Empty lines are also ignored.
+     *
+     * @param configFile Path to the configuration file
+     * @return true if candidates were loaded successfully, false otherwise
+     */
+
+    public boolean loadCandidatesFromFile(String configFile) {
+<span class="fc" id="L45">        logger.info(&quot;Loading candidates from file: {}&quot;, configFile);</span>
+<span class="fc" id="L46">        try (BufferedReader reader = new BufferedReader(new FileReader(configFile))) {</span>
+            String line;
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            while ((line = reader.readLine()) != null) {</span>
+<span class="fc" id="L49">                line = line.trim();</span>
+<span class="pc bpc" id="L50" title="1 of 4 branches missed.">                if (!line.isEmpty() &amp;&amp; !line.startsWith(&quot;#&quot;)) {</span>
+<span class="fc" id="L51">                    candidates.add(line);</span>
+                }
+            }
+<span class="fc" id="L54">            logger.info(&quot;Loaded {} candidates from file&quot;, candidates.size());</span>
+<span class="fc" id="L55">            return true;</span>
+<span class="nc" id="L56">        } catch (IOException e) {</span>
+<span class="nc" id="L57">            logger.error(&quot;Failed to load candidates from file: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L58">            return false;</span>
+        }
+    }
+
+    /**
+     * Adds a new candidate to the list if not already present.
+     *
+     * @param candidateName The name of the candidate to add
+     */
+
+    public void addCandidate(String candidateName) {
+<span class="fc" id="L69">        candidates.add(candidateName);</span>
+<span class="fc" id="L70">        logger.info(&quot;Added candidate: {}&quot;, candidateName);</span>
+<span class="fc" id="L71">    }</span>
+
+    /**
+     * Gets an unmodifiable list of all candidates.
+     *
+     * @return An unmodifiable list of candidate names
+     */
+
+    public List&lt;String&gt; getCandidates() {
+<span class="fc" id="L80">        return Collections.unmodifiableList(candidates);</span>
+    }
+
+    /**
+     * Checks whether a given name corresponds to a valid candidate.
+     *
+     * @param candidateName The name to check
+     * @return true if the name is a valid candidate, false otherwise
+     */
+
+    public boolean isValidCandidate(String candidateName) {
+<span class="fc" id="L91">        return candidates.contains(candidateName);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

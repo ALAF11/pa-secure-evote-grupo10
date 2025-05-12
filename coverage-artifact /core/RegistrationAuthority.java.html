@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RegistrationAuthority.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pa-secure-evote</a> &gt; <a href="index.source.html" class="el_package">core</a> &gt; <span class="el_source">RegistrationAuthority.java</span></div><h1>RegistrationAuthority.java</h1><pre class="source lang-java linenums">package core;
+
+import crypto.CertificateRevocationList;
+import model.ElectionManager;
+import model.ElectionPhase;
+import model.Voter;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.KeyUnwrapper;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.slf4j.Logger;
+import util.LoggingUtil;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.security.*;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Represents the Registration Authority in the e-voting system.
+ * &lt;p&gt;
+ * &lt;ul&gt;
+ *     &lt;li&gt;Maintaining the list of eligible voters&lt;/li&gt;
+ *     &lt;li&gt;Issuing X.509 certificates to authenticated voters&lt;/li&gt;
+ *     &lt;li&gt;Sharing eligible voter information with the Voting Server&lt;/li&gt;
+ *     &lt;li&gt;Managing certificate revocation through a Certificate Revocation List (CRL)&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * The Registration Authority operates primarily during the registration phase of an election,
+ * as managed by the ElectionManager.
+ */
+
+public class RegistrationAuthority {
+
+<span class="fc" id="L48">    private static final Logger logger = LoggingUtil.getLogger(RegistrationAuthority.class);</span>
+    private final KeyPair keyPair;
+<span class="fc" id="L50">    private final Map&lt;String, Boolean&gt; eligibleVoters = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L51">    private final CertificateRevocationList crl = new CertificateRevocationList();</span>
+    private final ElectionManager electionManager;
+<span class="fc" id="L53">    private final Map&lt;String, String&gt; serialNumberToVoterId = new ConcurrentHashMap&lt;&gt;();</span>
+
+    /**
+     * Constructs a new Registration Authority with the specified election manager.
+     *
+     * @param electionManager The election manager for phase control
+     * @throws NoSuchAlgorithmException If the RSA algorithm is not available
+     */
+
+<span class="fc" id="L62">    public RegistrationAuthority(ElectionManager electionManager) throws NoSuchAlgorithmException {</span>
+<span class="fc" id="L63">        this.electionManager = electionManager;</span>
+<span class="fc" id="L64">        logger.info(&quot;Initializing Registration Authority&quot;);</span>
+
+<span class="fc" id="L66">        KeyPairGenerator keyGen = KeyPairGenerator.getInstance(&quot;RSA&quot;);</span>
+<span class="fc" id="L67">        keyGen.initialize(2048, new SecureRandom());</span>
+<span class="fc" id="L68">        this.keyPair = keyGen.generateKeyPair();</span>
+
+<span class="fc" id="L70">        logger.info(&quot;Registration Authority initialized successfully&quot;);</span>
+<span class="fc" id="L71">    }</span>
+
+    /**
+     * Registers a voter as eligible to participate in the election.
+     * &lt;p&gt;
+     * This method can only be called during the registration phase.
+     *
+     * @param voterId The unique identifier of the voter
+     * @return true if the voter was successfully registered, false if already registered
+     * @throws IllegalStateException If not in the registration phase
+     */
+
+    public boolean registerEligibleVoter(String voterId) {
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (!electionManager.isInPhase(ElectionPhase.REGISTRATION)) {</span>
+<span class="fc" id="L85">            logger.warn(&quot;Cannot register voter outside of registration phase&quot;);</span>
+<span class="fc" id="L86">            throw new IllegalStateException(&quot;Voter registration is not currently active&quot;);</span>
+        }
+
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (eligibleVoters.putIfAbsent(voterId, true) == null) {</span>
+<span class="fc" id="L90">            logger.info(&quot;Voter {} registered as eligible&quot;, voterId);</span>
+<span class="fc" id="L91">            return true;</span>
+        } else {
+<span class="fc" id="L93">            logger.info(&quot;Voter {} already registered as eligible&quot;, voterId);</span>
+<span class="fc" id="L94">            return false;</span>
+        }
+    }
+
+    /**
+     * Removes a voter from the list of eligible voters.
+     *
+     * @param voterId The unique identifier of the voter
+     * @return true if the voter was removed, false if not found
+     */
+
+    public boolean removeEligibleVoter(String voterId) {
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (eligibleVoters.remove(voterId) != null) {</span>
+<span class="fc" id="L107">            logger.info(&quot;Voter {} removed from eligible voters list&quot;, voterId);</span>
+<span class="fc" id="L108">            return true;</span>
+        } else {
+<span class="fc" id="L110">            logger.info(&quot;Voter {} not found in eligible voters list&quot;, voterId);</span>
+<span class="fc" id="L111">            return false;</span>
+        }
+    }
+
+    /**
+     * Issues an X.509 certificate to an eligible voter.
+     * &lt;p&gt;
+     * This method can only be called during the registration phase.
+     *
+     * @param voter The voter object containing identification and public key
+     * @return A signed X.509 certificate
+     * @throws OperatorCreationException If there's an error creating the certificate
+     * @throws CertificateException If there's an error with the certificate
+     * @throws IllegalStateException If not in the registration phase
+     * @throws SecurityException If the voter is not eligible
+     */
+
+    public X509Certificate issueCertificate(Voter voter) throws OperatorCreationException, CertificateException {
+<span class="fc" id="L129">        String transactionId = &quot;CERT_&quot; + UUID.randomUUID();</span>
+<span class="fc" id="L130">        LoggingUtil.setTransactionContext(transactionId);</span>
+
+        try {
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (!electionManager.isInPhase(ElectionPhase.REGISTRATION)) {</span>
+<span class="fc" id="L134">                logger.warn(&quot;Cannot issue certificate outside of registration phase&quot;);</span>
+<span class="fc" id="L135">                throw new IllegalStateException(&quot;Certificate issuance is not currently active&quot;);</span>
+            }
+
+<span class="fc" id="L138">            String voterId = voter.getId();</span>
+
+            // Check if voter is eligible
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (!eligibleVoters.containsKey(voterId)) {</span>
+<span class="fc" id="L142">                logger.warn(&quot;Certificate issuance failed: voter {} is not eligible&quot;, voterId);</span>
+<span class="fc" id="L143">                throw new SecurityException(&quot;Voter is not eligible for certificate issuance&quot;);</span>
+            }
+
+            // Generate certificate details
+<span class="fc" id="L147">            BigInteger serialNumber = new BigInteger(128, new SecureRandom());</span>
+<span class="fc" id="L148">            Date notBefore = new Date();</span>
+<span class="fc" id="L149">            Date notAfter = Date.from(Instant.now().plus(365, ChronoUnit.DAYS));</span>
+
+<span class="fc" id="L151">            X500Name issuerName = new X500Name(&quot;CN=Registration Authority&quot;);</span>
+<span class="fc" id="L152">            X500Name subjectName = new X500Name(&quot;CN=&quot; + voterId);</span>
+
+<span class="fc" id="L154">            PublicKey voterPublicKey = voter.getPublicKey();</span>
+<span class="fc" id="L155">            SubjectPublicKeyInfo subjectPublicKeyInfo = SubjectPublicKeyInfo.getInstance(</span>
+<span class="fc" id="L156">                    voterPublicKey.getEncoded());</span>
+
+            // Create certificate builder
+<span class="fc" id="L159">            X509v3CertificateBuilder certBuilder = new X509v3CertificateBuilder(</span>
+                    issuerName,
+                    serialNumber,
+                    notBefore,
+                    notAfter,
+                    subjectName,
+                    subjectPublicKeyInfo
+            );
+
+            // Sign the certificate
+<span class="fc" id="L169">            ContentSigner signer = new JcaContentSignerBuilder(&quot;SHA256withRSA&quot;)</span>
+<span class="fc" id="L170">                    .build(keyPair.getPrivate());</span>
+<span class="fc" id="L171">            X509CertificateHolder certHolder = certBuilder.build(signer);</span>
+
+            // Convert to X509Certificate
+<span class="fc" id="L174">            X509Certificate certificate = new JcaX509CertificateConverter()</span>
+<span class="fc" id="L175">                    .getCertificate(certHolder);</span>
+
+<span class="fc" id="L177">            serialNumberToVoterId.put(serialNumber.toString(), voterId);</span>
+<span class="fc" id="L178">            logger.info(&quot;Certificate issued for voter {}&quot;, voterId);</span>
+
+<span class="fc" id="L180">            return certificate;</span>
+        } finally {
+<span class="fc" id="L182">            LoggingUtil.clearTransactionContext();</span>
+        }
+    }
+
+    /**
+     * Shares the list of eligible voters with the voting server.
+     *
+     * @param votingServer The voting server to update
+     */
+
+    public void shareEligibleVotersListWithVotingServer(VotingServer votingServer) {
+<span class="nc" id="L193">        votingServer.updateEligibleVotersList(new ConcurrentHashMap&lt;&gt;(eligibleVoters));</span>
+<span class="nc" id="L194">        logger.info(&quot;Eligible voters list shared with Voting Server&quot;);</span>
+<span class="nc" id="L195">    }</span>
+
+    /**
+     * Exports the list of eligible voters to a file.
+     *
+     * @param filePath The path to save the file
+     * @throws IOException If there's an error writing to the file
+     */
+
+    public void exportEligibleVotersList(String filePath) throws IOException {
+<span class="nc" id="L205">        try (FileWriter writer = new FileWriter(filePath)) {</span>
+<span class="nc" id="L206">            writer.write(&quot;Eligible Voters List\n&quot;);</span>
+<span class="nc" id="L207">            writer.write(&quot;Generated: &quot; + Instant.now() + &quot;\n&quot;);</span>
+<span class="nc" id="L208">            writer.write(&quot;Total Eligible Voters: &quot; + eligibleVoters.size() + &quot;\n\n&quot;);</span>
+
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            for (String voterId : eligibleVoters.keySet()) {</span>
+<span class="nc" id="L211">                writer.write(voterId + &quot;\n&quot;);</span>
+<span class="nc" id="L212">            }</span>
+        }
+
+<span class="nc" id="L215">        logger.info(&quot;Eligible voters list exported to {}&quot;, filePath);</span>
+<span class="nc" id="L216">    }</span>
+
+    /**
+     * Revokes a certificate by adding it to the Certificate Revocation List.
+     *
+     * @param serialNumber The serial number of the certificate to revoke
+     * @param reason The reason for revocation
+     * @return true if the certificate was revoked, false otherwise
+     */
+
+    public boolean revokeCertificate(String serialNumber, String reason) {
+<span class="nc" id="L227">        boolean result = crl.revokeCertificate(serialNumber, reason);</span>
+
+<span class="nc bnc" id="L229" title="All 4 branches missed.">        if (result &amp;&amp; serialNumberToVoterId.containsKey(serialNumber)) {</span>
+<span class="nc" id="L230">            String voterId = serialNumberToVoterId.get(serialNumber);</span>
+<span class="nc" id="L231">            removeEligibleVoter(voterId);</span>
+        }
+
+<span class="nc" id="L234">        return result;</span>
+    }
+
+    public boolean isCertificateRevoked(String serialNumber) {
+<span class="nc" id="L238">        return crl.isRevoked(serialNumber);</span>
+    }
+
+    /**
+     * Gets the Certificate Revocation List.
+     *
+     * @return The CRL instance
+     */
+
+    public CertificateRevocationList getCrl() {
+<span class="nc" id="L248">        return crl;</span>
+    }
+
+    /**
+     * Gets the public key of the Registration Authority.
+     *
+     * @return The public key
+     */
+
+    public PublicKey getPublicKey() {
+<span class="fc" id="L258">        return keyPair.getPublic();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

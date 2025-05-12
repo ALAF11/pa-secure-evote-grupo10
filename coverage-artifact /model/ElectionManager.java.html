@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ElectionManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pa-secure-evote</a> &gt; <a href="index.source.html" class="el_package">model</a> &gt; <span class="el_source">ElectionManager.java</span></div><h1>ElectionManager.java</h1><pre class="source lang-java linenums">package model;
+
+import org.slf4j.Logger;
+import util.LoggingUtil;
+
+import java.time.Instant;
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * Manages the election phases and transitions in the e-voting system.
+ * &lt;p&gt;
+ * This class is responsible for:
+ * &lt;ul&gt;
+ *     &lt;li&gt;Tracking the current phase of the election&lt;/li&gt;
+ *     &lt;li&gt;Enforcing proper phase transitions&lt;/li&gt;
+ *     &lt;li&gt;Recording timestamps of phase transitions&lt;/li&gt;
+ *     &lt;li&gt;Providing phase status information to other components&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * The election progresses through five distinct phases:
+ * SETUP → REGISTRATION → VOTING → TALLYING → CLOSED
+ * &lt;p&gt;
+ * Thread-safe implementation using AtomicReference to manage concurrent access
+ * to phase information.
+ */
+
+<span class="fc" id="L27">public class ElectionManager {</span>
+<span class="fc" id="L28">    private static final Logger logger = LoggingUtil.getLogger(ElectionManager.class);</span>
+
+<span class="fc" id="L30">    private final AtomicReference&lt;ElectionPhase&gt; currentPhase =</span>
+            new AtomicReference&lt;&gt;(ElectionPhase.SETUP);
+<span class="fc" id="L32">    private final AtomicReference&lt;Instant&gt; phaseStartTime =</span>
+<span class="fc" id="L33">            new AtomicReference&lt;&gt;(Instant.now());</span>
+
+    /**
+     * Transitions the election to a new phase.
+     * &lt;p&gt;
+     * This method enforces a valid phase sequence:
+     * SETUP → REGISTRATION → VOTING → TALLYING → CLOSED
+     * &lt;p&gt;
+     * If an invalid transition is attempted, the method will log a warning
+     * and the phase will remain unchanged.
+     *
+     * @param newPhase The phase to transition to
+     */
+
+    public void transitionTo(ElectionPhase newPhase) {
+<span class="fc" id="L48">        ElectionPhase currentPhaseLoc = this.currentPhase.get();</span>
+
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (!isValidTransition(currentPhaseLoc, newPhase)) {</span>
+<span class="fc" id="L51">            logger.warn(&quot;Invalid phase transition from {} to {}&quot;,</span>
+                    currentPhaseLoc, newPhase);
+<span class="fc" id="L53">            return;</span>
+        }
+
+<span class="fc" id="L56">        boolean success = this.currentPhase.compareAndSet(currentPhaseLoc, newPhase);</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (success) {</span>
+<span class="fc" id="L58">            Instant now = Instant.now();</span>
+<span class="fc" id="L59">            phaseStartTime.set(now);</span>
+<span class="fc" id="L60">            logger.info(&quot;Election phase changed from {} to {} at {}&quot;,</span>
+                    currentPhaseLoc, newPhase, now);
+        }
+<span class="fc" id="L63">    }</span>
+
+    /**
+     * Determines whether a transition from one phase to another is valid.
+     * &lt;p&gt;
+     * Valid transitions follow the sequence:
+     * SETUP → REGISTRATION → VOTING → TALLYING → CLOSED
+     *
+     * @param from The current phase
+     * @param to The target phase
+     * @return true if the transition is valid, false otherwise
+     */
+
+    private boolean isValidTransition(ElectionPhase from, ElectionPhase to) {
+<span class="fc bfc" id="L77" title="All 5 branches covered.">        return switch (from) {</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            case SETUP -&gt; to == ElectionPhase.REGISTRATION;</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            case REGISTRATION -&gt; to == ElectionPhase.VOTING;</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            case VOTING -&gt; to == ElectionPhase.TALLYING;</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            case TALLYING -&gt; to == ElectionPhase.CLOSED;</span>
+<span class="fc" id="L82">            case CLOSED -&gt; false;</span>
+        };
+    }
+
+    /**
+     * Checks if the election is currently in the specified phase.
+     *
+     * @param phase The phase to check against the current phase
+     * @return true if the current phase matches the specified phase, false otherwise
+     */
+
+    public boolean isInPhase(ElectionPhase phase) {
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        return currentPhase.get() == phase;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

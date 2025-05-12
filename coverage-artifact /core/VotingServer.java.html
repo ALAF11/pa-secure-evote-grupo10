@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VotingServer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pa-secure-evote</a> &gt; <a href="index.source.html" class="el_package">core</a> &gt; <span class="el_source">VotingServer.java</span></div><h1>VotingServer.java</h1><pre class="source lang-java linenums">package core;
+
+import crypto.CertificateRevocationList;
+import exception.AuthenticationException;
+import model.ElectionManager;
+import model.ElectionPhase;
+import util.LoggingUtil;
+
+import org.slf4j.Logger;
+import java.security.PublicKey;
+import java.security.cert.X509Certificate;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Represents the Voting Server in the e-voting system.
+ * &lt;p&gt;
+ * This class is responsible for:
+ * &lt;ul&gt;
+ *     &lt;li&gt;Authenticating voters using their certificates&lt;/li&gt;
+ *     &lt;li&gt;Issuing secure voting tokens to authenticated voters&lt;/li&gt;
+ *     &lt;li&gt;Preventing duplicate voting by tracking used tokens and
+ *     voted voters&lt;/li&gt;
+ *     &lt;li&gt;Maintaining the list of eligible voters received from the
+ *     Registration Authority&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * The Voting Server operates during the voting phase of an election and
+ * interacts with the Registration Authority and Ballot Box.
+ */
+
+public class VotingServer {
+
+<span class="fc" id="L36">    private static final Logger logger = LoggingUtil.getLogger(VotingServer.class);</span>
+    private final Set&lt;String&gt; usedTokens;
+    private final PublicKey raPublicKey;
+    private final CertificateRevocationList crl;
+    private PublicKey aaPublicKey;
+<span class="fc" id="L41">    private Map&lt;String, Boolean&gt; eligibleVoters = new ConcurrentHashMap&lt;&gt;();</span>
+    private final ElectionManager electionManager;
+
+    // Add these fields to track voters who have already voted
+<span class="fc" id="L45">    private final Set&lt;String&gt; votedVoters = ConcurrentHashMap.newKeySet();</span>
+
+    /**
+     * Constructs a new Voting Server with the specified dependencies.
+     *
+     * @param raPublicKey The public key of the Registration Authority
+     * @param electionManager The election Manager for phase control
+     * @param crl The Certificate Revocation List
+     */
+
+<span class="fc" id="L55">    public VotingServer(PublicKey raPublicKey, ElectionManager electionManager, CertificateRevocationList crl) {</span>
+<span class="fc" id="L56">        logger.info(&quot;Initializing Voting Server&quot;);</span>
+<span class="fc" id="L57">        this.raPublicKey = raPublicKey;</span>
+<span class="fc" id="L58">        this.electionManager = electionManager;</span>
+<span class="fc" id="L59">        this.crl = crl;</span>
+<span class="fc" id="L60">        this.usedTokens = ConcurrentHashMap.newKeySet();</span>
+<span class="fc" id="L61">    }</span>
+
+
+    /**
+     * Updates the list of eligible voters from the Registration Authority.
+     *
+     * @param updatedList The updated list of eligible voters
+     */
+
+    public void updateEligibleVotersList(Map&lt;String, Boolean&gt; updatedList) {
+<span class="fc" id="L71">        this.eligibleVoters = new ConcurrentHashMap&lt;&gt;(updatedList);</span>
+<span class="fc" id="L72">        logger.info(&quot;Eligible voters list updated. Total eligible voters: {}&quot;, eligibleVoters.size());</span>
+<span class="fc" id="L73">    }</span>
+
+    /**
+     * Authenticates a voter using their certificate.
+     * &lt;p&gt;
+     * This method can only be called during the voting phase. It checks if the
+     * voter is eligible, if they have already voted, if the certificate is revoked,
+     * and validates their certificate.
+     *
+     * @param cert The voter's X.509 certificate
+     * @return A voting token if authentication is successful
+     * @throws AuthenticationException If authentication fails
+     */
+
+    public String authenticateVoter(X509Certificate cert) {
+<span class="fc" id="L88">        String transactionId = &quot;AUTH_&quot; + UUID.randomUUID();</span>
+<span class="fc" id="L89">        LoggingUtil.setTransactionContext(transactionId);</span>
+
+        try {
+            // Check if voting is active
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (!electionManager.isInPhase(ElectionPhase.VOTING)) {</span>
+<span class="fc" id="L94">                logger.warn(&quot;Authentication failed: voting is not currently active&quot;);</span>
+<span class="fc" id="L95">                throw new AuthenticationException(&quot;Voting is not currently active&quot;);</span>
+            }
+
+            // Extract voter ID from certificate
+<span class="fc" id="L99">            String voterId = extractVoterIdFromCertificate(cert);</span>
+<span class="fc" id="L100">            logger.debug(&quot;Authenticating voter: {}&quot;, voterId);</span>
+
+            // Check if voter has already voted
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (votedVoters.contains(voterId)) {</span>
+<span class="fc" id="L104">                logger.warn(&quot;Authentication failed: voter {} has already voted&quot;, voterId);</span>
+<span class="fc" id="L105">                throw new AuthenticationException(&quot;Voter is not eligible to vote&quot;);</span>
+            }
+
+            // Rest of existing checks
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (!eligibleVoters.containsKey(voterId)) {</span>
+<span class="fc" id="L110">                logger.warn(&quot;Authentication failed: voter {} is not eligible&quot;, voterId);</span>
+<span class="fc" id="L111">                throw new AuthenticationException(&quot;Voter is not eligible to vote&quot;);</span>
+            }
+
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (crl.isRevoked(cert)) {</span>
+<span class="fc" id="L115">                logger.warn(&quot;Authentication failed: certificate for voter {} is revoked&quot;, voterId);</span>
+<span class="fc" id="L116">                throw new AuthenticationException(&quot;Certificate has been revoked&quot;);</span>
+            }
+
+            try {
+<span class="fc" id="L120">                cert.verify(raPublicKey);</span>
+<span class="fc" id="L121">                cert.checkValidity();</span>
+<span class="fc" id="L122">                logger.debug(&quot;Certificate validated successfully&quot;);</span>
+<span class="fc" id="L123">            } catch (Exception e) {</span>
+<span class="fc" id="L124">                logger.warn(&quot;Authentication failed: invalid certificate for voter {}&quot;, voterId);</span>
+<span class="fc" id="L125">                throw new AuthenticationException(&quot;Invalid certificate: &quot; + e.getMessage());</span>
+<span class="fc" id="L126">            }</span>
+
+            // Generate a secure unique token
+<span class="fc" id="L129">            String token = UUID.randomUUID().toString();</span>
+<span class="fc" id="L130">            usedTokens.add(token);</span>
+
+<span class="fc" id="L132">            votedVoters.add(voterId);</span>
+
+<span class="fc" id="L134">            logger.info(&quot;Voter {} authenticated successfully, token issued&quot;, voterId);</span>
+<span class="fc" id="L135">            return token;</span>
+        } finally {
+<span class="fc" id="L137">            LoggingUtil.clearTransactionContext();</span>
+        }
+    }
+
+    /**
+     * Extracts voter ID from certificate subject DN.
+     *
+     * @param cert The X.509 certificate
+     * @return The extracted voter ID
+     * @throws IllegalArgumentException if ID extraction fails
+     */
+
+    private String extractVoterIdFromCertificate(X509Certificate cert) {
+<span class="fc" id="L150">        String subjectDN = cert.getSubjectX500Principal().getName();</span>
+<span class="fc" id="L151">        String[] parts = subjectDN.split(&quot;,&quot;);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        for (String part : parts) {</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (part.startsWith(&quot;CN=&quot;)) {</span>
+<span class="fc" id="L154">                return part.substring(3);</span>
+            }
+        }
+
+<span class="nc" id="L158">        throw new IllegalArgumentException(&quot;Cannot extract voter ID from certificate&quot;);</span>
+    }
+
+    /**
+     * Validates a voting token.
+     *
+     * @param token The token to validate
+     * @return true if the token is valid, false otherwise
+     */
+
+    public boolean validateToken(String token) {
+<span class="fc" id="L169">        return usedTokens.contains(token);</span>
+    }
+
+    /**
+     * Marks a token as used after a vote has been cast.
+     *
+     * @param token The token to mark as used
+     */
+
+    public void markTokenAsUsed(String token) {
+<span class="fc" id="L179">        usedTokens.remove(token);</span>
+<span class="fc" id="L180">        logger.debug(&quot;Token marked as used&quot;);</span>
+<span class="fc" id="L181">    }</span>
+
+    /**
+     * Sets the Tallying Authority's public key.
+     *
+     * @param aaPublicKey The public key of the Tallying Authority
+     */
+
+    public void setAaPublicKey(PublicKey aaPublicKey) {
+<span class="fc" id="L190">        this.aaPublicKey = aaPublicKey;</span>
+<span class="fc" id="L191">        logger.info(&quot;Tallying Authority public key set&quot;);</span>
+<span class="fc" id="L192">    }</span>
+
+    /**
+     * Gets the public key of the Tallying Authority.
+     *
+     * @return The public key of the Tallying Authority
+     */
+
+    public PublicKey getAaPublicKey() {
+<span class="fc" id="L201">        return aaPublicKey;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LoggingUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pa-secure-evote</a> &gt; <a href="index.source.html" class="el_package">util</a> &gt; <span class="el_source">LoggingUtil.java</span></div><h1>LoggingUtil.java</h1><pre class="source lang-java linenums">package util;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+
+/**
+ * Provides centralized logging utilities for the e-voting system.
+ * &lt;p&gt;
+ * This utility class is responsible for:
+ * &lt;ul&gt;
+ *     &lt;li&gt;Creating and configuring loggers for different components&lt;/li&gt;
+ *     &lt;li&gt;Managing transaction contexts through MDC (Mapped Diagnostic Context)&lt;/li&gt;
+ *     &lt;li&gt;Managing user contexts for audit logging&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * The class uses SLF4J for logging to provide a consistent interface
+ * regardless of the underlying logging implementation.
+ */
+
+public class LoggingUtil {
+
+    /**
+     * Private constructor to prevent instantiation of utility class.
+     */
+
+    private LoggingUtil(){
+        // Prevent instantiation
+    }
+
+    /**
+     * Gets a logger for the specified class.
+     *
+     * @param clazz The class to get the logger for
+     * @return A configured SLF4J Logger instance
+     */
+
+    public static Logger getLogger(Class&lt;?&gt; clazz) {
+<span class="fc" id="L39">        return LoggerFactory.getLogger(clazz);</span>
+    }
+
+    /**
+     * Sets the transaction context in the MDC.
+     * &lt;p&gt;
+     * This method is used to track operations across multiple components
+     * that are part of the same logical transaction.
+     *
+     * @param transactionId The ID of the transaction to set in the context
+     */
+
+    public static void setTransactionContext(String transactionId) {
+<span class="fc" id="L52">        MDC.put(&quot;transactionId&quot;, transactionId);</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * Clears the transaction context from the MDC.
+     * &lt;p&gt;
+     * Should be called when a transaction is completed to prevent
+     * context leakage between different transactions.
+     */
+
+    public static void clearTransactionContext() {
+<span class="fc" id="L63">        MDC.remove(&quot;transactionId&quot;);</span>
+<span class="fc" id="L64">    }</span>
+
+    /**
+     * Sets the user context in the MDC.
+     * &lt;p&gt;
+     * This method is used to associate log entries with a specific user,
+     * which is particularly useful for security audit logging.
+     *
+     * @param userId The ID of the user to set in the context
+     */
+
+    public static void setUserContext(String userId) {
+<span class="fc" id="L76">        MDC.put(&quot;userId&quot;, userId);</span>
+<span class="fc" id="L77">    }</span>
+
+    /**
+     * Clears the user context from the MDC.
+     * &lt;p&gt;
+     * Should be called when operations for a specific user are completed
+     * to prevent context leakage between different user operations.
+     */
+
+    public static void clearUserContext() {
+<span class="fc" id="L87">        MDC.remove(&quot;userId&quot;);</span>
+<span class="fc" id="L88">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
