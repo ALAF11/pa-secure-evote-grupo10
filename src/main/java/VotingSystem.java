@@ -111,6 +111,7 @@ public class VotingSystem {
             registrationAuthority.revokeCertificate(voter3.getCertificateSerialNumber(), "Voter requested revocation");
             registrationAuthority.removeEligibleVoter(VOTERS.get(2));
             registrationAuthority.shareEligibleVotersListWithVotingServer(votingServer);
+            registrationAuthority.exportEligibleVotersList("eligible_voters.txt");
 
             // Prompt for election closing
             logger.info("Press Enter to close the voting phase and start tallying...");

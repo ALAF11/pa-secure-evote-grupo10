@@ -1,4 +1,0 @@
-# Candidate list configuration file
-Candidate1
-Candidate2
-Candidate3
