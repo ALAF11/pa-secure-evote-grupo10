@@ -31,8 +31,8 @@ public class AuthenticationException extends EVotingException {
     /**
      * Constructs a new authentication exception with the specified detail message and cause.
      *
-     * @param message the detail message, saved for later retrieval by the {@link #getMessage()} method
-     * @param cause the cause, saved for later retrieval by the {@link #getCause()} method
+     * @param message The detail message (which is saved for later retrieval by the getMessage() method)
+     * @param cause The cause (which is saved for later retrieval by the getCause() method)
      */
 
     public AuthenticationException(String message, Throwable cause) {
