@@ -14,6 +14,23 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Represents the Voting Server in the e-voting system.
+ * <p>
+ * This class is responsible for:
+ * <ul>
+ *     <li>Authenticating voters using their certificates</li>
+ *     <li>Issuing secure voting tokens to authenticated voters</li>
+ *     <li>Preventing duplicate voting by tracking used tokens and
+ *     voted voters</li>
+ *     <li>Maintaining the list of eligible voters received from the
+ *     Registration Authority</li>
+ * </ul>
+ * <p>
+ * The Voting Server operates during the voting phase of an election and
+ * interacts with the Registration Authority and Ballot Box.
+ */
+
 public class VotingServer {
 
     private static final Logger logger = LoggingUtil.getLogger(VotingServer.class);
@@ -27,6 +44,14 @@ public class VotingServer {
     // Add these fields to track voters who have already voted
     private final Set<String> votedVoters = ConcurrentHashMap.newKeySet();
 
+    /**
+     * Constructs a new Voting Server with the specified dependencies.
+     *
+     * @param raPublicKey The public key of the Registration Authority
+     * @param electionManager The election Manager for phase control
+     * @param crl The Certificate Revocation List
+     */
+
     public VotingServer(PublicKey raPublicKey, ElectionManager electionManager, CertificateRevocationList crl) {
         logger.info("Initializing Voting Server");
         this.raPublicKey = raPublicKey;
@@ -35,14 +60,38 @@ public class VotingServer {
         this.usedTokens = ConcurrentHashMap.newKeySet();
     }
 
+    /**
+     * Constructs a new Voting Server with default dependencies.
+     *
+     * @param rapublicKey The Registration Authority's public key
+     */
+
     public VotingServer(PublicKey rapublicKey) {
         this(rapublicKey, new ElectionManager(), new CertificateRevocationList());
     }
+
+    /**
+     * Updates the list of eligible voters from the Registration Authority.
+     *
+     * @param updatedList The updated list of eligible voters
+     */
 
     public void updateEligibleVotersList(Map<String, Boolean> updatedList) {
         this.eligibleVoters = new ConcurrentHashMap<>(updatedList);
         logger.info("Eligible voters list updated. Total eligible voters: {}", eligibleVoters.size());
     }
+
+    /**
+     * Authenticates a voter using their certificate.
+     * <p>
+     * This method can only be called during the voting phase. It checks if the
+     * voter is eligible, if they have already voted, if the certificate is revoked,
+     * and validates their certificate.
+     *
+     * @param cert The voter's X.509 certificate
+     * @return A voting token if authentication is successful
+     * @throws AuthenticationException If authentication fails
+     */
 
     public String authenticateVoter(X509Certificate cert) {
         String transactionId = "AUTH_" + UUID.randomUUID();
@@ -98,6 +147,14 @@ public class VotingServer {
         }
     }
 
+    /**
+     * Extracts voter ID from certificate subject DN.
+     *
+     * @param cert The X.509 certificate
+     * @return The extracted voter ID
+     * @throws IllegalArgumentException if ID extraction fails
+     */
+
     private String extractVoterIdFromCertificate(X509Certificate cert) {
         String subjectDN = cert.getSubjectX500Principal().getName();
         String[] parts = subjectDN.split(",");
@@ -110,19 +167,44 @@ public class VotingServer {
         throw new IllegalArgumentException("Cannot extract voter ID from certificate");
     }
 
+    /**
+     * Validates a voting token.
+     *
+     * @param token The token to validate
+     * @return true if the token is valid, false otherwise
+     */
+
     public boolean validateToken(String token) {
         return usedTokens.contains(token);
     }
+
+    /**
+     * Marks a token as used after a vote has been cast.
+     *
+     * @param token The token to mark as used
+     */
 
     public void markTokenAsUsed(String token) {
         usedTokens.remove(token);
         logger.debug("Token marked as used");
     }
 
+    /**
+     * Sets the Tallying Authority's public key.
+     *
+     * @param aaPublicKey The public key of the Tallying Authority
+     */
+
     public void setAaPublicKey(PublicKey aaPublicKey) {
         this.aaPublicKey = aaPublicKey;
         logger.info("Tallying Authority public key set");
     }
+
+    /**
+     * Gets the public key of the Tallying Authority.
+     *
+     * @return The public key of the Tallying Authority
+     */
 
     public PublicKey getAaPublicKey() {
         return aaPublicKey;
