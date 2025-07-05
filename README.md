@@ -27,16 +27,13 @@ O sistema foi projetado para garantir que nenhum voto possa ser associado ao ele
 - **JaCoCo** - Relatórios de cobertura
 - **Maven** - Gestão de dependências
 
-## Pré-requisitos
+## Entidades do Sistema
 
-- Java JDK 17 ou superior
-- Maven 3.6+
-
-## Como Executar
-
-- Abrir o projeto no IDE
-- Executar a classe `VotingSystem.java`
-
+- **Registration Authority (AR)** - Emite certificados X.509
+- **Voting Server (SV)** - Autentica eleitores
+- **Ballot Box (UE)** - Armazena votos encriptados
+- **Tallying Authority (AA)** - Desencripta e conta votos
+- **Voting System** - Coordena todo o processo
 
 ## Fluxo de Votação
 
@@ -52,13 +49,15 @@ O sistema foi projetado para garantir que nenhum voto possa ser associado ao ele
 - Desencriptação com threshold cryptography
 - Publicação de resultados
 
-## Entidades do Sistema
+## Pré-requisitos
 
-- **Registration Authority (AR)** - Emite certificados X.509
-- **Voting Server (SV)** - Autentica eleitores
-- **Ballot Box (UE)** - Armazena votos encriptados
-- **Tallying Authority (AA)** - Desencripta e conta votos
-- **Voting System** - Coordena todo o processo
+- Java JDK 17 ou superior
+- Maven 3.6+
+
+## Como Executar
+
+- Abrir o projeto no IDE
+- Executar a classe `VotingSystem.java`
 
 ## Funcionalidades de Segurança
 
