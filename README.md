@@ -27,6 +27,16 @@ O sistema foi projetado para garantir que nenhum voto possa ser associado ao ele
 - **JaCoCo** - Relatórios de cobertura
 - **Maven** - Gestão de dependências
 
+## Pré-requisitos
+
+- Java JDK 17 ou superior
+- Maven 3.6+
+
+## Como Executar
+
+- Abrir o projeto no IDE
+- Executar a classe `VotingSystem.java`
+
 ## Entidades do Sistema
 
 - **Registration Authority (AR)** - Emite certificados X.509
@@ -48,16 +58,6 @@ O sistema foi projetado para garantir que nenhum voto possa ser associado ao ele
 ### 3. Fase de Apuramento
 - Desencriptação com threshold cryptography
 - Publicação de resultados
-
-## Pré-requisitos
-
-- Java JDK 17 ou superior
-- Maven 3.6+
-
-## Como Executar
-
-- Abrir o projeto no IDE
-- Executar a classe `VotingSystem.java`
 
 ## Funcionalidades de Segurança
 
